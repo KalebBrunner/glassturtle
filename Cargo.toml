@@ -1,0 +1,12 @@
+[package]
+name = "glassturtle"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+glfw = "0.61"
+gl = "0.14"
+
+[[bin]]
+name = "glassturtle"
+path = "main.rs"
