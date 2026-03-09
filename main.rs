@@ -18,7 +18,7 @@ impl<'a> State<'a> {
             backends: wgpu::Backends::all(),
             ..Default::default()
         };
-        let instance = wgpu::Instance::new(instance_descriptor);
+        let instance = wgpu::Instance::new(&instance_descriptor);
         let surface = instance.create_surface(window.render_context()).unwrap();
 
         let adapter_descriptor = wgpu::RequestAdapterOptionsBase {
@@ -32,11 +32,11 @@ impl<'a> State<'a> {
             required_features: wgpu::Features::empty(),
             required_limits: wgpu::Limits::default(),
             label: Some("Device"),
+            experimental_features: wgpu::ExperimentalFeatures::default(),
+            memory_hints: wgpu::MemoryHints::default(),
+            trace: wgpu::Trace::Off,
         };
-        let (device, queue) = adapter
-            .request_device(&device_descriptor, None)
-            .await
-            .unwrap();
+        let (device, queue) = adapter.request_device(&device_descriptor).await.unwrap();
 
         let surface_capabilities = surface.get_capabilities(&adapter);
         let surface_format = surface_capabilities
@@ -109,6 +109,7 @@ impl<'a> State<'a> {
                 }),
                 store: wgpu::StoreOp::Store,
             },
+            depth_slice: None,
         };
 
         let render_pass_descriptor = wgpu::RenderPassDescriptor {
@@ -117,6 +118,7 @@ impl<'a> State<'a> {
             depth_stencil_attachment: None,
             occlusion_query_set: None,
             timestamp_writes: None,
+            multiview_mask: None,
         };
 
         command_encoder.begin_render_pass(&render_pass_descriptor);
@@ -132,7 +134,7 @@ async fn run() {
     let mut glfw = glfw::init(fail_on_errors!()).unwrap();
     glfw.window_hint(WindowHint::ClientApi(ClientApiHint::NoApi));
     let (mut window, events) = glfw
-        .create_window(800, 600, "It's WGPU time.", glfw::WindowMode::Windowed)
+        .create_window(800, 600, "Glass Turtle", glfw::WindowMode::Windowed)
         .unwrap();
 
     let mut state = State::new(&mut window).await;
