@@ -4,8 +4,9 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-glfw = "0.61"
-gl = "0.14"
+glfw = "0.56.0"
+wgpu =  "0.19.1"
+pollster = "*"
 
 [[bin]]
 name = "glassturtle"
