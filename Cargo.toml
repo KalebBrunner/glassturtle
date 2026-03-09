@@ -10,4 +10,4 @@ pollster = "*"
 
 [[bin]]
 name = "glassturtle"
-path = "main.rs"
+path = "src/main.rs"
