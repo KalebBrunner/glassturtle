@@ -1,4 +1,4 @@
-use crate::renderer_backend::PipelineBuilder;
+use crate::renderer_backend::{PipelineBuilder, mesh_builder};
 use glfw::Window;
 
 pub struct State<'a> {
@@ -10,6 +10,7 @@ pub struct State<'a> {
     pub size: (i32, i32),
     pub window: &'a mut Window,
     render_pipeline: wgpu::RenderPipeline,
+    triangle_mesh: wgpu::Buffer,
 }
 
 impl<'a> State<'a> {
@@ -40,6 +41,7 @@ impl<'a> State<'a> {
             memory_hints: wgpu::MemoryHints::default(),
             trace: wgpu::Trace::Off,
         };
+
         let (device, queue) = adapter.request_device(&device_descriptor).await.unwrap();
 
         let surface_capabilities = surface.get_capabilities(&adapter);
@@ -70,9 +72,6 @@ impl<'a> State<'a> {
             wgpu::CompositeAlphaMode::Opaque
         };
 
-        eprintln!("alpha modes: {:?}", surface_capabilities.alpha_modes);
-        eprintln!("chosen alpha mode: {:?}", alpha_mode);
-
         let config = wgpu::SurfaceConfiguration {
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
             format: surface_format,
@@ -85,7 +84,10 @@ impl<'a> State<'a> {
         };
         surface.configure(&device, &config);
 
+        let triangle_mesh = mesh_builder::make_triangle(&device);
+
         let mut pipeline_builder = PipelineBuilder::new();
+        pipeline_builder.add_buffer_layout(mesh_builder::Vertex::get_layout());
         pipeline_builder.set_shader_module("shaders/shader.wgsl", "vs_main", "fs_main");
         pipeline_builder.set_pixel_format(config.format);
         let render_pipeline = pipeline_builder.build_pipeline(&device);
@@ -144,6 +146,7 @@ impl<'a> State<'a> {
             config,
             size,
             render_pipeline,
+            triangle_mesh,
         }
     }
 
@@ -191,7 +194,7 @@ impl<'a> State<'a> {
             depth_slice: None,
         };
 
-        let mut render_pass = command_encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+        let mut renderpass = command_encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: Some("Render Pass"),
             color_attachments: &[Some(color_attachment)],
             depth_stencil_attachment: None,
@@ -200,10 +203,11 @@ impl<'a> State<'a> {
             multiview_mask: None,
         });
 
-        render_pass.set_pipeline(&self.render_pipeline);
-        render_pass.draw(0..3, 0..1);
+        renderpass.set_pipeline(&self.render_pipeline);
+        renderpass.set_vertex_buffer(0, self.triangle_mesh.slice(..));
+        renderpass.draw(0..3, 0..1);
 
-        drop(render_pass);
+        drop(renderpass);
 
         self.queue.submit(std::iter::once(command_encoder.finish()));
         drawable.present();
