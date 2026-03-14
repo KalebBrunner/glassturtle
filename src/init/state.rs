@@ -1,26 +1,5 @@
+use crate::renderer_backend::PipelineBuilder;
 use glfw::Window;
-
-const BORDER_SHADER: &str = r#"
-@vertex
-fn vs_main(@builtin(vertex_index) i: u32) -> @builtin(position) vec4<f32> {
-    // Slight inset so the line stays visible instead of sitting exactly on the clip edge.
-    var positions = array<vec2<f32>, 5>(
-        vec2(-0.995, -0.995),
-        vec2( 0.995, -0.995),
-        vec2( 0.995,  0.995),
-        vec2(-0.995,  0.995),
-        vec2(-0.995, -0.995),
-    );
-
-    let p = positions[i];
-    return vec4<f32>(p, 0.0, 1.0);
-}
-
-@fragment
-fn fs_main() -> @location(0) vec4<f32> {
-    return vec4<f32>(1.0, 0.0, 0.0, 1.0); // solid red
-}
-"#;
 
 pub struct State<'a> {
     instance: wgpu::Instance,
@@ -30,7 +9,7 @@ pub struct State<'a> {
     config: wgpu::SurfaceConfiguration,
     pub size: (i32, i32),
     pub window: &'a mut Window,
-    border_pipeline: wgpu::RenderPipeline,
+    render_pipeline: wgpu::RenderPipeline,
 }
 
 impl<'a> State<'a> {
@@ -106,50 +85,55 @@ impl<'a> State<'a> {
         };
         surface.configure(&device, &config);
 
-        let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-            label: Some("Border Shader"),
-            source: wgpu::ShaderSource::Wgsl(BORDER_SHADER.into()),
-        });
+        let mut pipeline_builder = PipelineBuilder::new();
+        pipeline_builder.set_shader_module("shaders/shader.wgsl", "vs_main", "fs_main");
+        pipeline_builder.set_pixel_format(config.format);
+        let render_pipeline = pipeline_builder.build_pipeline(&device);
 
-        let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            label: Some("Border Pipeline Layout"),
-            bind_group_layouts: &[],
-            immediate_size: 0,
-        });
+        // let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+        //     label: Some("Border Shader"),
+        //     source: wgpu::ShaderSource::Wgsl(BORDER_SHADER.into()),
+        // });
 
-        let border_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: Some("Border Pipeline"),
-            layout: Some(&pipeline_layout),
-            vertex: wgpu::VertexState {
-                module: &shader,
-                entry_point: Some("vs_main"),
-                compilation_options: wgpu::PipelineCompilationOptions::default(),
-                buffers: &[],
-            },
-            primitive: wgpu::PrimitiveState {
-                topology: wgpu::PrimitiveTopology::LineStrip,
-                strip_index_format: None,
-                front_face: wgpu::FrontFace::Ccw,
-                cull_mode: None,
-                unclipped_depth: false,
-                polygon_mode: wgpu::PolygonMode::Fill,
-                conservative: false,
-            },
-            depth_stencil: None,
-            multisample: wgpu::MultisampleState::default(),
-            fragment: Some(wgpu::FragmentState {
-                module: &shader,
-                entry_point: Some("fs_main"),
-                compilation_options: wgpu::PipelineCompilationOptions::default(),
-                targets: &[Some(wgpu::ColorTargetState {
-                    format: surface_format,
-                    blend: None,
-                    write_mask: wgpu::ColorWrites::ALL,
-                })],
-            }),
-            multiview_mask: None,
-            cache: None,
-        });
+        // let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+        //     label: Some("Border Pipeline Layout"),
+        //     bind_group_layouts: &[],
+        //     immediate_size: 0,
+        // });
+
+        // let border_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+        //     label: Some("Border Pipeline"),
+        //     layout: Some(&pipeline_layout),
+        //     vertex: wgpu::VertexState {
+        //         module: &shader,
+        //         entry_point: Some("vs_main"),
+        //         compilation_options: wgpu::PipelineCompilationOptions::default(),
+        //         buffers: &[],
+        //     },
+        //     primitive: wgpu::PrimitiveState {
+        //         topology: wgpu::PrimitiveTopology::LineStrip,
+        //         strip_index_format: None,
+        //         front_face: wgpu::FrontFace::Ccw,
+        //         cull_mode: None,
+        //         unclipped_depth: false,
+        //         polygon_mode: wgpu::PolygonMode::Fill,
+        //         conservative: false,
+        //     },
+        //     depth_stencil: None,
+        //     multisample: wgpu::MultisampleState::default(),
+        //     fragment: Some(wgpu::FragmentState {
+        //         module: &shader,
+        //         entry_point: Some("fs_main"),
+        //         compilation_options: wgpu::PipelineCompilationOptions::default(),
+        //         targets: &[Some(wgpu::ColorTargetState {
+        //             format: surface_format,
+        //             blend: None,
+        //             write_mask: wgpu::ColorWrites::ALL,
+        //         })],
+        //     }),
+        //     multiview_mask: None,
+        //     cache: None,
+        // });
 
         Self {
             instance,
@@ -159,7 +143,7 @@ impl<'a> State<'a> {
             queue,
             config,
             size,
-            border_pipeline,
+            render_pipeline,
         }
     }
 
@@ -216,8 +200,8 @@ impl<'a> State<'a> {
             multiview_mask: None,
         });
 
-        render_pass.set_pipeline(&self.border_pipeline);
-        render_pass.draw(0..5, 0..1);
+        render_pass.set_pipeline(&self.render_pipeline);
+        render_pass.draw(0..3, 0..1);
 
         drop(render_pass);
 

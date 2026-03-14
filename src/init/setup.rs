@@ -7,8 +7,8 @@ pub fn setup() -> (
 ) {
     let mut glfw = glfw::init(fail_on_errors!()).unwrap();
 
-    glfw.window_hint(WindowHint::Decorated(false));
     glfw.window_hint(WindowHint::TransparentFramebuffer(true));
+    // glfw.window_hint(WindowHint::Decorated(false));
     glfw.window_hint(WindowHint::MousePassthrough(true));
 
     let (mut window, events) = glfw
