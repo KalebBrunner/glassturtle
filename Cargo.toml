@@ -6,7 +6,7 @@ edition = "2024"
 [dependencies]
 vulkano = "0.35"
 vulkano-shaders = "0.35"
-glfw = { version = "0.61.0", default-features = false, features = ["x11", "src-build", "raw-window-handle-v0-6"] }
+glfw = { version = "0.61.0", default-features = false, features = ["x11", "src-build", "raw-window-handle-v0-6", "vulkan"] }
 pollster ="*"
 
 [[bin]]

@@ -5,22 +5,25 @@ use vulkano::{
     instance::{Instance, InstanceCreateInfo, InstanceExtensions},
 };
 
-pub fn init_vulkan() -> Arc<Instance> {
+pub fn init_vulkan(glfw_required_extensions: Vec<String>) -> Arc<Instance> {
     let library = VulkanLibrary::new().expect("failed to load Vulkan loader");
+    println!("highest Vulkan V: {:?}", library.api_version());
 
-    Instance::new(
-        library,
-        InstanceCreateInfo {
-            engine_name: Some("No Engine".into()),
-            engine_version: Version::V1_0,
-            ..InstanceCreateInfo::application_from_cargo_toml()
-        },
-    )
-    .expect("failed to create Vulkan instance")
+    let extensions = glfw_extensions_to_vulkano(&glfw_required_extensions);
+
+    let create_info = InstanceCreateInfo {
+        engine_name: Some("Glass Turtle Graphics".into()),
+        engine_version: Version::V1_0,
+        max_api_version: Some(Version::V1_0),
+        enabled_extensions: extensions,
+        ..InstanceCreateInfo::application_from_cargo_toml()
+    };
+
+    Instance::new(library, create_info).expect("failed to create Vulkan instance")
 }
 
 fn glfw_extensions_to_vulkano(names: &[String]) -> InstanceExtensions {
-    let mut extensions = InstanceExtensions::empty();
+    let mut extensions: InstanceExtensions = InstanceExtensions::empty();
 
     for name in names {
         match name.as_str() {
@@ -36,4 +39,10 @@ fn glfw_extensions_to_vulkano(names: &[String]) -> InstanceExtensions {
     }
 
     extensions
+}
+
+pub fn list_physical_devices(instance: Arc<Instance>) {
+    for physical_device in instance.enumerate_physical_devices().unwrap() {
+        println!("GPU Device: {}", physical_device.properties().device_name);
+    }
 }

@@ -1,6 +1,10 @@
 mod glfw;
 mod vulkan;
-use crate::{glfw::init_window, vulkan::init_vulkan};
+
+use crate::{
+    glfw::init_window,
+    vulkan::{init_vulkan, list_physical_devices},
+};
 
 async fn run() {
     /*
@@ -16,11 +20,18 @@ async fn run() {
     - keyboards
     - mice
      */
-    let (mut glfw, mut window, events) = init_window();
+    let (mut glfw, window, _events) = init_window();
     println!("GLFW context: {:?}", glfw.get_platform());
 
-    let instance = init_vulkan();
+    let req_extensions = glfw
+        .get_required_instance_extensions()
+        .expect("GLFW did not return Vulkan instance extensions; Vulkan may be unavailable");
+    println!("Required Extensions = {:?}", req_extensions);
+
+    let instance = init_vulkan(req_extensions);
     println!("Vulkan api: {:?}", instance.api_version());
+
+    list_physical_devices(instance);
 
     while !window.should_close() {
         glfw.poll_events();
