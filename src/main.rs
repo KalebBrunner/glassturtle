@@ -1,5 +1,6 @@
 mod glfw;
-use crate::glfw::initWindow;
+mod vulkan;
+use crate::{glfw::init_window, vulkan::init_vulkan};
 
 async fn run() {
     /*
@@ -15,11 +16,11 @@ async fn run() {
     - keyboards
     - mice
      */
-    let (mut glfw, mut window, events) = initWindow();
-    print!("{:?}", window.get_context_version());
+    let (mut glfw, mut window, events) = init_window();
+    println!("GLFW context: {:?}", glfw.get_platform());
 
-    // get custom state object
-    // let mut state = State::new(&mut window).await;
+    let instance = init_vulkan();
+    println!("Vulkan api: {:?}", instance.api_version());
 
     while !window.should_close() {
         glfw.poll_events();

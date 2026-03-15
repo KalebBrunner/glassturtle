@@ -1,12 +1,12 @@
-use glfw::{WindowHint, fail_on_errors};
+use glfw::{ClientApiHint, WindowHint, fail_on_errors};
 
-pub fn initWindow() -> (
+pub fn init_window() -> (
     glfw::Glfw,
     glfw::PWindow,
     glfw::GlfwReceiver<(f64, glfw::WindowEvent)>,
 ) {
     let mut glfw = glfw::init(fail_on_errors!()).unwrap();
-
+    glfw.window_hint(WindowHint::ClientApi(ClientApiHint::NoApi));
     glfw.window_hint(WindowHint::Resizable(false));
     glfw.window_hint(WindowHint::TransparentFramebuffer(true));
     // glfw.window_hint(WindowHint::Decorated(false));
