@@ -2,28 +2,12 @@ use std::sync::Arc;
 
 use vulkano::{
     Version, VulkanLibrary,
-    instance::{Instance, InstanceCreateInfo, InstanceExtensions},
+    device::physical::PhysicalDevice,
+    instance::{self, Instance, InstanceCreateInfo, InstanceExtensions},
 };
 
 const USE_VALIDATION_LAYERS: bool = true;
 const VALIDATION_LAYERS: [&str; 1] = ["VK_LAYER_KHRONOS_validation"];
-
-pub fn init_vulkan(extensions: InstanceExtensions) -> Arc<Instance> {
-    let vulkan = init_vulkan_instance(extensions);
-    println!("Vulkan instance api: {:?}", vulkan.api_version());
-
-    list_physical_devices(&vulkan);
-    let device_id = 0;
-    let physical_device = vulkan
-        .enumerate_physical_devices()
-        .unwrap()
-        .nth(device_id)
-        .expect("Selected Vulkan physical device not found");
-
-    let queue_family = physical_device.queue_family_properties();
-
-    vulkan
-}
 
 fn init_vulkan_instance(extensions: InstanceExtensions) -> Arc<Instance> {
     let library = VulkanLibrary::new().expect("failed to load Vulkan loader");
@@ -75,4 +59,15 @@ fn create_validation_layers(library: &Arc<VulkanLibrary>) -> Vec<String> {
     );
 
     required_layer_names
+}
+
+pub fn init_physical(vulkan: &Arc<Instance>) -> Arc<PhysicalDevice> {
+    list_physical_devices(vulkan);
+    let device_id = 0;
+    let physical_device = vulkan
+        .enumerate_physical_devices()
+        .unwrap()
+        .nth(device_id)
+        .expect("Selected Vulkan physical device not found");
+    physical_device
 }

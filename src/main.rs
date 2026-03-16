@@ -8,7 +8,7 @@ use std::sync::Arc;
 
 use vulkano::swapchain::Surface;
 
-use crate::{glfw::init_glfw, vulkan::init_vulkan};
+use crate::{glfw::init_glfw, vulkan::init_physical};
 
 async fn run() {
     /*
@@ -26,8 +26,11 @@ async fn run() {
      */
     let (mut glfw, glfw_window, glfw_events, required_extensions) = init_glfw();
     let window = Arc::new(glfw_window);
-    let vulkan = init_vulkan(required_extensions);
-    let surface = Surface::from_window(vulkan, window.clone()).expect("failed to create surface");
+    let vulkan = init_vulkan_instance(required_extensions);
+    let surface =
+        Surface::from_window(vulkan.clone(), window.clone()).expect("failed to create surface");
+
+    let physical = init_physical(&vulkan);
 
     while !window.should_close() {
         glfw.poll_events();
@@ -35,6 +38,12 @@ async fn run() {
         // key_match(&mut state, &events);
         // update_state(&mut state)
     }
+}
+
+fn init_vulkan_instance(
+    required_extensions: vulkano::instance::InstanceExtensions,
+) -> Arc<vulkano::instance::Instance> {
+    todo!()
 }
 
 fn main() {
