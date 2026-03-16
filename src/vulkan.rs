@@ -9,6 +9,23 @@ const USE_VALIDATION_LAYERS: bool = true;
 const VALIDATION_LAYERS: [&str; 1] = ["VK_LAYER_KHRONOS_validation"];
 
 pub fn init_vulkan(extensions: InstanceExtensions) -> Arc<Instance> {
+    let vulkan = init_vulkan_instance(extensions);
+    println!("Vulkan instance api: {:?}", vulkan.api_version());
+
+    list_physical_devices(&vulkan);
+    let device_id = 0;
+    let physical_device = vulkan
+        .enumerate_physical_devices()
+        .unwrap()
+        .nth(device_id)
+        .expect("Selected Vulkan physical device not found");
+
+    let queue_family = physical_device.queue_family_properties();
+
+    vulkan
+}
+
+fn init_vulkan_instance(extensions: InstanceExtensions) -> Arc<Instance> {
     let library = VulkanLibrary::new().expect("failed to load Vulkan loader");
     println!("Highest Vulkan ver: {:?}", library.api_version());
 
@@ -29,14 +46,14 @@ pub fn init_vulkan(extensions: InstanceExtensions) -> Arc<Instance> {
     Instance::new(library, create_info).expect("failed to create Vulkan instance")
 }
 
-pub fn list_physical_devices(instance: &Arc<Instance>) {
+fn list_physical_devices(instance: &Arc<Instance>) {
     let devices = instance.enumerate_physical_devices().unwrap();
     for device in devices {
         println!("GPU Device: {}", device.properties().device_name);
     }
 }
 
-pub fn create_validation_layers(library: &Arc<VulkanLibrary>) -> Vec<String> {
+fn create_validation_layers(library: &Arc<VulkanLibrary>) -> Vec<String> {
     let available_layer_names: Vec<String> = library
         .layer_properties()
         .unwrap()
