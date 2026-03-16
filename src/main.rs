@@ -1,9 +1,11 @@
 mod glfw;
 mod vulkan;
+mod vulkan_matcher;
 
 use crate::{
     glfw::init_window,
     vulkan::{init_vulkan, list_physical_devices},
+    vulkan_matcher::match_extensions_names,
 };
 
 async fn run() {
@@ -23,15 +25,21 @@ async fn run() {
     let (mut glfw, window, _events) = init_window();
     println!("GLFW context: {:?}", glfw.get_platform());
 
-    let req_extensions = glfw
+    let glfw_required_extensions = glfw
         .get_required_instance_extensions()
         .expect("GLFW did not return Vulkan instance extensions; Vulkan may be unavailable");
-    println!("Required Extensions = {:?}", req_extensions);
+    println!(
+        "Extensions required by glfw = {:?}",
+        glfw_required_extensions
+    );
 
-    let instance = init_vulkan(req_extensions);
-    println!("Vulkan api: {:?}", instance.api_version());
+    let required_extensions = match_extensions_names(glfw_required_extensions);
 
-    list_physical_devices(instance);
+    let instance = init_vulkan(required_extensions);
+    println!("Vulkan instance api: {:?}", instance.api_version());
+
+    list_physical_devices(&instance);
+    let physical_device = instance.enumerate_physical_devices().unwrap().nth(0);
 
     while !window.should_close() {
         glfw.poll_events();

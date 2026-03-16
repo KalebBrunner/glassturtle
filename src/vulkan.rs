@@ -5,16 +5,23 @@ use vulkano::{
     instance::{Instance, InstanceCreateInfo, InstanceExtensions},
 };
 
-pub fn init_vulkan(glfw_required_extensions: Vec<String>) -> Arc<Instance> {
-    let library = VulkanLibrary::new().expect("failed to load Vulkan loader");
-    println!("highest Vulkan V: {:?}", library.api_version());
+const USE_VALIDATION_LAYERS: bool = true;
+const VALIDATION_LAYERS: [&str; 1] = ["VK_LAYER_KHRONOS_validation"];
 
-    let extensions = glfw_extensions_to_vulkano(&glfw_required_extensions);
+pub fn init_vulkan(extensions: InstanceExtensions) -> Arc<Instance> {
+    let library = VulkanLibrary::new().expect("failed to load Vulkan loader");
+    println!("Highest Vulkan ver: {:?}", library.api_version());
+
+    let mut layers = vec![];
+    if USE_VALIDATION_LAYERS {
+        layers = create_validation_layers(&library);
+    }
 
     let create_info = InstanceCreateInfo {
         engine_name: Some("Glass Turtle Graphics".into()),
-        engine_version: Version::V1_0,
-        max_api_version: Some(Version::V1_0),
+        engine_version: Version::V1_5,
+        max_api_version: Some(Version::V1_5),
+        enabled_layers: layers,
         enabled_extensions: extensions,
         ..InstanceCreateInfo::application_from_cargo_toml()
     };
@@ -22,27 +29,33 @@ pub fn init_vulkan(glfw_required_extensions: Vec<String>) -> Arc<Instance> {
     Instance::new(library, create_info).expect("failed to create Vulkan instance")
 }
 
-fn glfw_extensions_to_vulkano(names: &[String]) -> InstanceExtensions {
-    let mut extensions: InstanceExtensions = InstanceExtensions::empty();
-
-    for name in names {
-        match name.as_str() {
-            "VK_KHR_surface" => extensions.khr_surface = true,
-            "VK_KHR_wayland_surface" => extensions.khr_wayland_surface = true,
-            "VK_KHR_xcb_surface" => extensions.khr_xcb_surface = true,
-            "VK_KHR_xlib_surface" => extensions.khr_xlib_surface = true,
-            "VK_KHR_win32_surface" => extensions.khr_win32_surface = true,
-            "VK_EXT_metal_surface" => extensions.ext_metal_surface = true,
-            "VK_MVK_macos_surface" => extensions.mvk_macos_surface = true,
-            other => panic!("unhandled GLFW-required instance extension: {other}"),
-        }
+pub fn list_physical_devices(instance: &Arc<Instance>) {
+    let devices = instance.enumerate_physical_devices().unwrap();
+    for device in devices {
+        println!("GPU Device: {}", device.properties().device_name);
     }
-
-    extensions
 }
 
-pub fn list_physical_devices(instance: Arc<Instance>) {
-    for physical_device in instance.enumerate_physical_devices().unwrap() {
-        println!("GPU Device: {}", physical_device.properties().device_name);
-    }
+pub fn create_validation_layers(library: &Arc<VulkanLibrary>) -> Vec<String> {
+    let available_layer_names: Vec<String> = library
+        .layer_properties()
+        .unwrap()
+        .map(|layer| layer.name().to_owned())
+        .collect();
+
+    let required_layer_names = VALIDATION_LAYERS.map(|layer| layer.to_owned()).to_vec();
+    println!("Required layers: {:?}", required_layer_names);
+
+    let missing_layer_names: Vec<_> = required_layer_names
+        .iter()
+        .filter(|req| !available_layer_names.iter().any(|avail| avail == *req))
+        .collect();
+
+    assert!(
+        missing_layer_names.is_empty(),
+        "Required Vulkan validation layer(s) not found: {:?}",
+        missing_layer_names,
+    );
+
+    required_layer_names
 }
