@@ -9,7 +9,7 @@ pub fn init_glfw() -> (
     Glfw,
     PWindow,
     GlfwReceiver<(f64, glfw::WindowEvent)>,
-    InstanceExtensions,
+    // InstanceExtensions,
 ) {
     let mut glfw = glfw::init(fail_on_errors!()).unwrap();
     glfw.window_hint(WindowHint::ClientApi(ClientApiHint::NoApi));
@@ -19,7 +19,7 @@ pub fn init_glfw() -> (
     glfw.window_hint(WindowHint::MousePassthrough(true));
 
     let (mut window, events) = glfw
-        .create_window(800, 600, "Glass Turtle.", glfw::WindowMode::Windowed)
+        .create_window(640, 480, "Glass Turtle.", glfw::WindowMode::Windowed)
         .unwrap();
 
     window.set_framebuffer_size_polling(true);
@@ -27,8 +27,8 @@ pub fn init_glfw() -> (
     window.set_mouse_button_polling(true);
     window.set_pos_polling(true);
 
-    let ext = get_required_extensions(&glfw);
-    (glfw, window, events, ext)
+    // let ext = get_required_extensions(&glfw);
+    (glfw, window, events)
 }
 
 fn get_required_extensions(glfw: &Glfw) -> InstanceExtensions {
