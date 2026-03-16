@@ -1,8 +1,10 @@
-// #![allow(unused_imports)]
-// #![allow(unused_variables)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
+
 mod device;
 mod glfw;
-mod render_pipelines;
+mod pipeline;
+mod renderpass;
 mod shaders;
 mod swapchain;
 mod vertex_buffer;
@@ -11,15 +13,26 @@ mod vulkan_matcher;
 
 use std::{fmt::Debug, sync::Arc};
 
-use vulkano::swapchain::Surface;
+use vulkano::{
+    buffer::BufferContents, pipeline::graphics::vertex_input::Vertex, swapchain::Surface,
+};
 
 use crate::{
     device::{init_logical_device, init_physical_device},
     glfw::init_glfw,
-    render_pipelines::init_renderpass,
     swapchain::init_swapchain,
     vulkan::init_vulkan_instance,
 };
+
+#[derive(BufferContents, Vertex, Clone, Copy, Debug)]
+#[repr(C)]
+pub struct MyTriangleVertex {
+    #[format(R32G32_SFLOAT)]
+    pub position: [f32; 2],
+
+    #[format(R32G32B32_SFLOAT)]
+    pub color: [f32; 3],
+}
 
 async fn run() {
     /*
@@ -52,8 +65,6 @@ async fn run() {
 
     let (swapchain, images) = init_swapchain(surface, logical_device);
     quick_print("Swapchain info", &swapchain.create_info());
-
-    let render_pass = init_renderpass(logical_device, swapchain);
 
     while !window.should_close() {
         glfw.poll_events();

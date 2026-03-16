@@ -1,22 +1,13 @@
 use std::sync::Arc;
 
 use vulkano::{
-    buffer::{self, Buffer, BufferContents, BufferCreateInfo, BufferUsage},
+    buffer::{Buffer, BufferCreateInfo, BufferUsage},
     command_buffer::allocator::StandardCommandBufferAllocator,
     device::Device,
     memory::allocator::{AllocationCreateInfo, MemoryTypeFilter, StandardMemoryAllocator},
-    pipeline::graphics::vertex_input::Vertex,
 };
 
-#[derive(BufferContents, Vertex, Clone, Copy, Debug)]
-#[repr(C)]
-pub struct MyTriangleVertex {
-    #[format(R32G32_SFLOAT)]
-    pub position: [f32; 2],
-
-    #[format(R32G32B32_SFLOAT)]
-    pub color: [f32; 3],
-}
+use crate::MyTriangleVertex;
 
 pub fn init_vertex_bufffer(device: Arc<Device>) {
     let memory_allocator = Arc::new(StandardMemoryAllocator::new(
@@ -47,19 +38,4 @@ pub fn init_vertex_bufffer(device: Arc<Device>) {
             color: [0.0, 0.0, 1.0],
         },
     ];
-
-    let vertex_buffer = Buffer::from_iter(
-        memory_allocator,
-        BufferCreateInfo {
-            usage: BufferUsage::VERTEX_BUFFER,
-            ..Default::default()
-        },
-        AllocationCreateInfo {
-            memory_type_filter: MemoryTypeFilter::PREFER_DEVICE
-                | MemoryTypeFilter::HOST_SEQUENTIAL_WRITE,
-            ..Default::default()
-        },
-        vertices,
-    )
-    .unwrap();
 }
