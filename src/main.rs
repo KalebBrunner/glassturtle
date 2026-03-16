@@ -1,9 +1,15 @@
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 mod glfw;
+mod surface;
 mod vulkan;
 mod vulkan_matcher;
 
+use std::sync::Arc;
+
 use crate::{
     glfw::init_window,
+    surface::create_surface,
     vulkan::{init_vulkan, list_physical_devices},
     vulkan_matcher::match_extensions_names,
 };
@@ -22,7 +28,8 @@ async fn run() {
     - keyboards
     - mice
      */
-    let (mut glfw, window, _events) = init_window();
+    let (mut glfw, glfw_window, _events) = init_window();
+    let window = Arc::new(glfw_window);
     println!("GLFW context: {:?}", glfw.get_platform());
 
     let glfw_required_extensions = glfw
@@ -38,8 +45,15 @@ async fn run() {
     let instance = init_vulkan(required_extensions);
     println!("Vulkan instance api: {:?}", instance.api_version());
 
+    let surface = create_surface(instance.clone(), window.clone());
+
     list_physical_devices(&instance);
-    let physical_device = instance.enumerate_physical_devices().unwrap().nth(0);
+    let device_id = 0;
+    let physical_device = instance
+        .enumerate_physical_devices()
+        .unwrap()
+        .nth(device_id)
+        .expect("Selected Vulkan physical device not found");
 
     while !window.should_close() {
         glfw.poll_events();
@@ -47,6 +61,9 @@ async fn run() {
         // key_match(&mut state, &events);
         // update_state(&mut state)
     }
+
+    let queue_family = physical_device.queue_family_properties();
+    println!("{:?}", queue_family);
 }
 
 fn main() {
