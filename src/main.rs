@@ -20,6 +20,7 @@ use vulkano::{
 use crate::{
     device::{init_logical_device, init_physical_device},
     glfw::init_glfw,
+    renderpass::init_renderpass,
     swapchain::init_swapchain,
     vulkan::init_vulkan_instance,
 };
@@ -63,8 +64,10 @@ async fn run() {
         queue.device().enabled_extensions(),
     );
 
-    let (swapchain, images) = init_swapchain(surface, logical_device);
+    let (swapchain, images) = init_swapchain(surface, &logical_device);
     quick_print("Swapchain info", &swapchain.create_info());
+
+    let renderpass = init_renderpass(&logical_device, swapchain);
 
     while !window.should_close() {
         glfw.poll_events();

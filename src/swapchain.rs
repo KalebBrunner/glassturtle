@@ -13,7 +13,7 @@ use vulkano::{
 
 pub fn init_swapchain(
     surface: Arc<Surface>,
-    logical_device: Arc<Device>,
+    logical_device: &Arc<Device>,
 ) -> (Arc<Swapchain>, Vec<Arc<Image>>) {
     let surface_capabilities = logical_device
         .physical_device()
@@ -64,8 +64,8 @@ pub fn init_swapchain(
     // Create the swapchain and its images.
     let (swapchain, images) = Swapchain::new(
         // Create the swapchain in this `device`'s memory.
-        logical_device, // The surface where the images will be presented.
-        surface,        // The creation parameters.
+        logical_device.clone(), // The surface where the images will be presented.
+        surface,                // The creation parameters.
         swap_info,
     )
     .unwrap();

@@ -2,11 +2,12 @@ use std::sync::Arc;
 
 use vulkano::{device::Device, render_pass::RenderPass, swapchain::Swapchain};
 
-pub fn init_renderpass(device: Arc<Device>, swapchain: Arc<Swapchain>) -> Arc<RenderPass> {
+pub fn init_renderpass(device: &Arc<Device>, swapchain: Arc<Swapchain>) -> Arc<RenderPass> {
     // The next step is to create a *render pass*, which is an object that describes where the
     // output of the graphics pipeline will go. It describes the layout of the images where the
     // colors, depth and/or stencil information will be written.
-    let render_pass = vulkano::single_pass_renderpass!(
+
+    vulkano::single_pass_renderpass!(
         device.clone(),
         attachments: {
             // `color` is a custom name we give to the first and only attachment.
@@ -36,7 +37,5 @@ pub fn init_renderpass(device: Arc<Device>, swapchain: Arc<Swapchain>) -> Arc<Re
             depth_stencil: {},
         },
     )
-    .unwrap();
-
-    render_pass
+    .unwrap()
 }
