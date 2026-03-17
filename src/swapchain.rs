@@ -33,7 +33,7 @@ pub fn init_swapchain(
     let pre_transform = surface_capabilities.current_transform;
 
     // Use the first available format.
-    let (image_format, color_space) = logical_device
+    let (image_format, _color_space) = logical_device
         .physical_device()
         .surface_formats(&surface, Default::default())
         .unwrap()[0];

@@ -1,5 +1,5 @@
-#![allow(unused_imports)]
-#![allow(unused_variables)]
+// #![allow(unused_imports)]
+// #![allow(unused_variables)]
 
 mod device;
 mod frame_buffer;
@@ -14,22 +14,11 @@ mod vulkan_matcher;
 
 use std::{fmt::Debug, sync::Arc};
 
-use ::glfw::{Action, Key, WindowEvent};
 use vulkano::{
-    buffer::BufferContents,
-    pipeline::graphics::vertex_input::Vertex,
-    swapchain::Surface,
-    sync::{self, GpuFuture},
+    buffer::BufferContents, pipeline::graphics::vertex_input::Vertex, swapchain::Surface,
 };
 
-use crate::{
-    device::{init_logical_device, init_physical_device},
-    frame_buffer::window_size_dependent_setup,
-    glfw::init_glfw,
-    renderpass::init_renderpass,
-    swapchain::init_swapchain,
-    vulkan::init_vulkan_instance,
-};
+use crate::{glfw::init_glfw, vulkan::init_vulkan};
 
 #[derive(BufferContents, Vertex, Clone, Copy, Debug)]
 #[repr(C)]
@@ -56,51 +45,32 @@ async fn run() {
     - mice
      */
     let (mut glfw, glfw_window, glfw_events) = init_glfw();
-
-    // Core
     let window = Arc::new(glfw_window);
-    let required_extensions =
-        Surface::required_extensions(&window).expect("Failed to get required extensions");
-    let vulkan = init_vulkan_instance(required_extensions);
-    let surface =
-        Surface::from_window(vulkan.clone(), window.clone()).expect("failed to create surface");
-    let physical_device = init_physical_device(&vulkan);
-    let (logical_device, mut queues) = init_logical_device(physical_device.clone());
-    let queue = queues.next().unwrap();
-    quick_print(
-        "Active queue extensions",
-        queue.device().enabled_extensions(),
-    );
-
-    let (swapchain, swapchain_images) = init_swapchain(&surface, logical_device.clone());
-    let render_pass = init_renderpass(&logical_device, swapchain);
-    let mut framebuffers = window_size_dependent_setup(&swapchain_images, render_pass.clone());
-    let mut recreate_swapchain = false;
-    let previous_frame_end = Some(sync::now(logical_device.clone()).boxed());
+    init_vulkan(window.clone());
 
     while !window.should_close() {
         glfw.poll_events();
 
-        for (_, event) in glfw::flush_messages(&events) {
-            match event {
-                WindowEvent::FramebufferSize(_, _) => {
-                    renderer.recreate_swapchain = true;
-                }
-                WindowEvent::Close => {
-                    // if needed
-                }
-                WindowEvent::Key(Key::Escape, _, Action::Press, _) => {
-                    // if you kept window mutable instead of Arc-only access:
-                    // glfw_window.set_should_close(true);
-                }
-                _ => {}
-            }
-        }
-
-        draw_frame(&mut renderer, &window);
+        //     for (_, event) in glfw::flush_messages(&events) {
+        //         match event {
+        //             WindowEvent::FramebufferSize(_, _) => {
+        //                 renderer.recreate_swapchain = true;
+        //             }
+        //             WindowEvent::Close => {
+        //                 // if needed
+        //             }
+        //             WindowEvent::Key(Key::Escape, _, Action::Press, _) => {
+        //                 // if you kept window mutable instead of Arc-only access:
+        //                 // glfw_window.set_should_close(true);
+        //             }
+        //             _ => {}
+        //         }
     }
 
-    wait_idle(&renderer);
+    //     draw_frame(&mut renderer, &window);
+    // }
+
+    // wait_idle(&renderer);
 }
 
 fn main() {
