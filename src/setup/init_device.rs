@@ -1,15 +1,19 @@
 use std::sync::Arc;
-
-use vulkano::{
-    device::{
-        Device, DeviceCreateInfo, DeviceExtensions, DeviceFeatures, Queue, QueueCreateInfo,
-        physical::{self, PhysicalDevice},
-    },
-    instance::Instance,
+use vulkano::device::{
+    DeviceCreateInfo, DeviceExtensions, DeviceFeatures, Queue, QueueCreateInfo,
+    physical::PhysicalDevice,
 };
+use vulkano::{device::Device, instance::Instance};
 
-pub fn init_physical_device(vulkan: &Arc<Instance>) -> Arc<PhysicalDevice> {
-    // list_physical_devices(vulkan);
+pub fn init_device(vulkan: Arc<Instance>) -> Arc<Device> {
+    let physical_device = init_physical_device(&vulkan);
+    let (logical_device, mut queues) = init_logical_device(physical_device.clone());
+    let queue = queues.next().unwrap();
+
+    logical_device
+}
+
+fn init_physical_device(vulkan: &Arc<Instance>) -> Arc<PhysicalDevice> {
     let device_id = 0;
     let physical_device = vulkan
         .enumerate_physical_devices()
@@ -48,11 +52,4 @@ pub fn init_logical_device(
         Err(err) => panic!("Couldn't build device: {:?}", err),
     };
     device
-}
-
-fn list_physical_devices(instance: &Arc<Instance>) {
-    let devices = instance.enumerate_physical_devices().unwrap();
-    for device in devices {
-        println!("GPU Device: {}", device.properties().device_name);
-    }
 }

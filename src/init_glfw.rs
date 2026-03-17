@@ -1,9 +1,4 @@
-use std::sync::Arc;
-
-use glfw::{ClientApiHint, Glfw, GlfwReceiver, PWindow, Window, WindowHint, fail_on_errors};
-use vulkano::instance::InstanceExtensions;
-
-use crate::vulkan_matcher::match_extensions_names;
+use glfw::{ClientApiHint, Glfw, GlfwReceiver, PWindow, WindowHint, fail_on_errors};
 
 pub fn init_glfw() -> (
     Glfw,
@@ -11,6 +6,19 @@ pub fn init_glfw() -> (
     GlfwReceiver<(f64, glfw::WindowEvent)>,
     // InstanceExtensions,
 ) {
+    /*
+    https://en.wikipedia.org/wiki/GLFW
+    GLFW (Good Luck Future Witches) is a lightweight utility library for
+    use with OpenGL, OpenGL ES and Vulkan. It provides programmers with
+    the ability to create and manage
+    - windows
+    - OpenGL contexts
+    - Vulkan contexts
+    as well as handle
+    - joysticks
+    - keyboards
+    - mice
+     */
     let mut glfw = glfw::init(fail_on_errors!()).unwrap();
     glfw.window_hint(WindowHint::ClientApi(ClientApiHint::NoApi));
     glfw.window_hint(WindowHint::Resizable(false));
@@ -29,16 +37,4 @@ pub fn init_glfw() -> (
 
     // let ext = get_required_extensions(&glfw);
     (glfw, window, events)
-}
-
-fn get_required_extensions(glfw: &Glfw) -> InstanceExtensions {
-    let glfw_required_extensions = glfw
-        .get_required_instance_extensions()
-        .expect("GLFW did not return Vulkan instance extensions; Vulkan may be unavailable");
-    println!(
-        "Extensions required by glfw = {:?}",
-        glfw_required_extensions
-    );
-
-    match_extensions_names(glfw_required_extensions)
 }

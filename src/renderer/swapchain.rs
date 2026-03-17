@@ -17,7 +17,7 @@ pub fn init_swapchain(
 ) -> (Arc<Swapchain>, Vec<Arc<Image>>) {
     let surface_capabilities = logical_device
         .physical_device()
-        .surface_capabilities(&surface, Default::default())
+        .surface_capabilities(surface, Default::default())
         .unwrap();
 
     // Use the current window size or some fixed resolution.
