@@ -36,7 +36,7 @@ pub fn init_logical_device(
         ..DeviceExtensions::empty()
     };
 
-    let device = match Device::new(
+    match Device::new(
         physical_device,
         DeviceCreateInfo {
             queue_create_infos: vec![QueueCreateInfo {
@@ -50,6 +50,5 @@ pub fn init_logical_device(
     ) {
         Ok(d) => d,
         Err(err) => panic!("Couldn't build device: {:?}", err),
-    };
-    device
+    }
 }

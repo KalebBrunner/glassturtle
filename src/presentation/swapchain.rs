@@ -35,7 +35,7 @@ pub fn init_swapchain(
     // Use the first available format.
     let (image_format, _color_space) = logical_device
         .physical_device()
-        .surface_formats(&surface, Default::default())
+        .surface_formats(surface, Default::default())
         .unwrap()[0];
     let composite_alpha = CompositeAlpha::Inherit;
     let present_mode = PresentMode::Fifo;

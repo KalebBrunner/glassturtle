@@ -16,7 +16,6 @@ use vulkano::command_buffer::{
     SubpassContents, SubpassEndInfo,
 };
 use vulkano::device::{Device, Queue};
-use vulkano::instance::Instance;
 use vulkano::pipeline::GraphicsPipeline;
 use vulkano::pipeline::graphics::viewport::Viewport;
 use vulkano::render_pass::{Framebuffer, RenderPass};
@@ -30,7 +29,6 @@ use crate::shaders::MyTriangleVertex;
 use crate::vertex_buffer::init_vertex_bufffer;
 
 struct App {
-    instance: Arc<Instance>,
     device: Arc<Device>,
     queue: Arc<Queue>,
     command_buffer_allocator: Arc<StandardCommandBufferAllocator>,
@@ -171,14 +169,13 @@ async fn run() {
     // GLFW stands for Good Luck Fellow Witches and is the window manager
     let (mut glfw, glfw_window, events) = init_glfw();
     let window = Arc::new(glfw_window);
-    let (vulkan, surface, device, queue) = init_vulkan(window.clone());
+    let (_vulkan, surface, device, queue) = init_vulkan(window.clone());
 
     let (command_buffer_allocator, vertex_buffer) = init_vertex_bufffer(device.clone());
 
     let render_context = init_render_context(window.clone(), surface, device.clone());
 
     let mut myapp = App {
-        instance: vulkan,
         device,
         queue,
         command_buffer_allocator,
@@ -190,14 +187,10 @@ async fn run() {
         glfw.poll_events();
 
         for (_, event) in glfw::flush_messages(&events) {
-            match event {
-                // glfw::WindowEvent::Close => window.set_should_close(true),
-                glfw::WindowEvent::FramebufferSize(_, _) => {
-                    if let Some(rcx) = myapp.render_context.as_mut() {
-                        rcx.recreate_swapchain = true;
-                    }
-                }
-                _ => {}
+            if let glfw::WindowEvent::FramebufferSize(_, _) = event
+                && let Some(rcx) = myapp.render_context.as_mut()
+            {
+                rcx.recreate_swapchain = true;
             }
         }
 

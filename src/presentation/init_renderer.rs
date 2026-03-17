@@ -3,7 +3,6 @@ use std::sync::Arc;
 use glfw::PWindow;
 use vulkano::{
     device::Device,
-    image::{self, Image},
     pipeline::{
         DynamicState, GraphicsPipeline, PipelineLayout, PipelineShaderStageCreateInfo,
         graphics::{
@@ -12,14 +11,13 @@ use vulkano::{
             input_assembly::InputAssemblyState,
             multisample::MultisampleState,
             rasterization::RasterizationState,
-            subpass,
             vertex_input::{Vertex, VertexDefinition},
             viewport::{Viewport, ViewportState},
         },
         layout::PipelineDescriptorSetLayoutCreateInfo,
     },
-    render_pass::{RenderPass, Subpass},
-    swapchain::{self, Surface, Swapchain},
+    render_pass::Subpass,
+    swapchain::Surface,
     sync::{self, GpuFuture},
 };
 
@@ -71,8 +69,8 @@ pub fn init_render_context(
         }
     }
 
-    let vs = vs::load(device.clone()).unwrap();
-    let fs = fs::load(device.clone()).unwrap();
+    // let vs = vs::load(device.clone()).unwrap();
+    // let fs = fs::load(device.clone()).unwrap();
 
     let render_pass = vulkano::single_pass_renderpass!(
         device.clone(),
@@ -106,7 +104,7 @@ pub fn init_render_context(
     )
     .unwrap();
 
-    let framebuffers = window_size_dependent_setup(&swapchain_images, render_pass.clone());
+    // let framebuffers = window_size_dependent_setup(&swapchain_images, render_pass.clone());
 
     let pipeline = {
         let vs = vs::load(device.clone())
@@ -172,7 +170,7 @@ pub fn init_render_context(
     };
 
     let framebuffers = window_size_dependent_setup(&swapchain_images, render_pass.clone());
-    let mut recreate_swapchain = false;
+    let recreate_swapchain = false;
     let previous_frame_end = Some(sync::now(device.clone()).boxed());
 
     let image_extent = swapchain.image_extent();
