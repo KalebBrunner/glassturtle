@@ -2,6 +2,7 @@
 #![allow(unused_variables)]
 
 mod device;
+mod frame_buffer;
 mod glfw;
 mod pipeline;
 mod renderpass;
@@ -19,6 +20,7 @@ use vulkano::{
 
 use crate::{
     device::{init_logical_device, init_physical_device},
+    frame_buffer::window_size_dependent_setup,
     glfw::init_glfw,
     renderpass::init_renderpass,
     swapchain::init_swapchain,
@@ -50,6 +52,8 @@ async fn run() {
     - mice
      */
     let (mut glfw, glfw_window, glfw_events) = init_glfw();
+
+    // Core
     let window = Arc::new(glfw_window);
     let required_extensions =
         Surface::required_extensions(&window).expect("Failed to get required extensions");
@@ -57,17 +61,16 @@ async fn run() {
     let surface =
         Surface::from_window(vulkan.clone(), window.clone()).expect("failed to create surface");
     let physical_device = init_physical_device(&vulkan);
-    let (logical_device, mut queues) = init_logical_device(&physical_device);
+    let (logical_device, mut queues) = init_logical_device(physical_device.clone());
     let queue = queues.next().unwrap();
     quick_print(
         "Active queue extensions",
         queue.device().enabled_extensions(),
     );
 
-    let (swapchain, images) = init_swapchain(surface, &logical_device);
-    quick_print("Swapchain info", &swapchain.create_info());
-
-    let renderpass = init_renderpass(&logical_device, swapchain);
+    let (swapchain, swapchain_images) = init_swapchain(&surface, logical_device.clone());
+    let render_pass = init_renderpass(&logical_device, swapchain);
+    let mut framebuffers = window_size_dependent_setup(&swapchain_images, render_pass.clone());
 
     while !window.should_close() {
         glfw.poll_events();
@@ -83,3 +86,8 @@ fn main() {
 pub fn quick_print<T: Debug>(name: &str, value: &T) {
     println!("{}: {:?}", name, value);
 }
+
+// other created functions
+// window_size_dependent_setup
+// init_vertex_bufffer
+// fs and vs shaders

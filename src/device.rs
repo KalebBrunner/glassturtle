@@ -24,7 +24,7 @@ pub fn init_physical_device(vulkan: &Arc<Instance>) -> Arc<PhysicalDevice> {
 }
 
 pub fn init_logical_device(
-    physical_device: &Arc<PhysicalDevice>,
+    physical_device: Arc<PhysicalDevice>,
 ) -> (Arc<Device>, impl ExactSizeIterator<Item = Arc<Queue>>) {
     let features = DeviceFeatures::empty();
     let extensions = DeviceExtensions {
@@ -33,7 +33,7 @@ pub fn init_logical_device(
     };
 
     let device = match Device::new(
-        physical_device.clone(),
+        physical_device,
         DeviceCreateInfo {
             queue_create_infos: vec![QueueCreateInfo {
                 queue_family_index: 0,
