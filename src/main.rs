@@ -14,8 +14,12 @@ mod vulkan_matcher;
 
 use std::{fmt::Debug, sync::Arc};
 
+use ::glfw::{Action, Key, WindowEvent};
 use vulkano::{
-    buffer::BufferContents, pipeline::graphics::vertex_input::Vertex, swapchain::Surface,
+    buffer::BufferContents,
+    pipeline::graphics::vertex_input::Vertex,
+    swapchain::Surface,
+    sync::{self, GpuFuture},
 };
 
 use crate::{
@@ -71,13 +75,32 @@ async fn run() {
     let (swapchain, swapchain_images) = init_swapchain(&surface, logical_device.clone());
     let render_pass = init_renderpass(&logical_device, swapchain);
     let mut framebuffers = window_size_dependent_setup(&swapchain_images, render_pass.clone());
+    let mut recreate_swapchain = false;
+    let previous_frame_end = Some(sync::now(logical_device.clone()).boxed());
 
     while !window.should_close() {
         glfw.poll_events();
 
-        // key_match(&mut state, &events);
-        // update_state(&mut state)
+        for (_, event) in glfw::flush_messages(&events) {
+            match event {
+                WindowEvent::FramebufferSize(_, _) => {
+                    renderer.recreate_swapchain = true;
+                }
+                WindowEvent::Close => {
+                    // if needed
+                }
+                WindowEvent::Key(Key::Escape, _, Action::Press, _) => {
+                    // if you kept window mutable instead of Arc-only access:
+                    // glfw_window.set_should_close(true);
+                }
+                _ => {}
+            }
+        }
+
+        draw_frame(&mut renderer, &window);
     }
+
+    wait_idle(&renderer);
 }
 
 fn main() {
