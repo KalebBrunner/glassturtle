@@ -21,7 +21,7 @@ pub fn init_glfw() -> (
      */
     let mut glfw = glfw::init(fail_on_errors!()).unwrap();
     glfw.window_hint(WindowHint::ClientApi(ClientApiHint::NoApi));
-    glfw.window_hint(WindowHint::Resizable(false));
+    // glfw.window_hint(WindowHint::Resizable(false));
     glfw.window_hint(WindowHint::TransparentFramebuffer(true));
     // glfw.window_hint(WindowHint::Decorated(false));
     glfw.window_hint(WindowHint::MousePassthrough(true));

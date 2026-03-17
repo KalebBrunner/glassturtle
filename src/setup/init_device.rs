@@ -5,12 +5,12 @@ use vulkano::device::{
 };
 use vulkano::{device::Device, instance::Instance};
 
-pub fn init_device(vulkan: Arc<Instance>) -> Arc<Device> {
+pub fn init_device(vulkan: Arc<Instance>) -> (Arc<Device>, Arc<Queue>) {
     let physical_device = init_physical_device(&vulkan);
     let (logical_device, mut queues) = init_logical_device(physical_device.clone());
     let queue = queues.next().unwrap();
 
-    logical_device
+    (logical_device, queue)
 }
 
 fn init_physical_device(vulkan: &Arc<Instance>) -> Arc<PhysicalDevice> {
