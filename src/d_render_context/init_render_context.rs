@@ -22,10 +22,10 @@ use vulkano::{
 };
 
 use crate::{
-    c_vertex_buffers::MyTriangleVertex,
     d_render_context::{
         render_context::RenderContext, swapchain::init_swapchain, window_size_dependent_setup,
     },
+    struct_my_vertex::MyTriangleVertex,
 };
 
 pub fn init_render_context(

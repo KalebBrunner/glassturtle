@@ -1,27 +1,28 @@
 // #![allow(unused_imports)]
 // #![allow(unused_variables)]
 
-mod a_glfw;
-mod b_vulkan;
-mod c_vertex_buffers;
 mod d_render_context;
+mod myglfw;
+mod struct_my_vertex;
+mod vertex_buffer;
+mod vulkan;
 
-use crate::a_glfw::init_glfw;
-use crate::b_vulkan::init_vulkan;
-use crate::c_vertex_buffers::init_vertex_buffer;
-use crate::d_render_context::{App, init_render_context};
+use crate::d_render_context::App;
+use crate::d_render_context::init_render_context;
+use crate::myglfw::init_glfw;
+use crate::vertex_buffer::init_vertex_buffer;
+use crate::vulkan::init_vulkan;
 
 fn main() {
     pollster::block_on(run());
 }
 
 async fn run() {
-    // GLFW stands for Good Luck Fellow Witches and is the window manager
+    // GLFW is the window manager api. It stands for Good Luck Fellow Witches
     let (mut glfw, window, events) = init_glfw();
+    // Vulkan is the api that talks to the graphics card
     let (_vulkan, surface, device, queue) = init_vulkan(window.clone());
-
     let (command_buffer_allocator, vertex_buffer) = init_vertex_buffer(device.clone());
-
     let render_context = init_render_context(window.clone(), surface, device.clone());
 
     let mut myapp = App {

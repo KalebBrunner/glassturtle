@@ -7,7 +7,7 @@ use vulkano::{
     memory::allocator::{AllocationCreateInfo, MemoryTypeFilter, StandardMemoryAllocator},
 };
 
-use crate::c_vertex_buffers::MyTriangleVertex;
+use crate::struct_my_vertex::MyTriangleVertex;
 
 pub fn init_vertex_buffer(
     device: Arc<Device>,

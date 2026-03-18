@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
 use crate::{
-    c_vertex_buffers::MyTriangleVertex,
     d_render_context::{render_context::RenderContext, window_size_dependent_setup},
+    struct_my_vertex::MyTriangleVertex,
 };
 
 use vulkano::{
