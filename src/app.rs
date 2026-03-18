@@ -1,10 +1,4 @@
 use std::sync::Arc;
-
-use crate::{
-    d_render_context::{render_context::RenderContext, window_size_dependent_setup},
-    struct_my_vertex::MyTriangleVertex,
-};
-
 use vulkano::{
     buffer::Subbuffer,
     command_buffer::{
@@ -17,12 +11,16 @@ use vulkano::{
     sync::{self, GpuFuture},
 };
 
+use crate::rcx::MyRenderContext;
+use crate::shaders::struct_triangle::MyTriangleVertex;
+use crate::window_size_dependent_setup;
+
 pub struct App {
     pub device: Arc<Device>,
     pub queue: Arc<Queue>,
     pub command_buffer_allocator: Arc<StandardCommandBufferAllocator>,
     pub vertex_buffer: Subbuffer<[MyTriangleVertex]>,
-    pub render_context: Option<RenderContext>,
+    pub render_context: Option<MyRenderContext>,
 }
 
 impl App {

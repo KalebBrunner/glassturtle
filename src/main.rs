@@ -1,15 +1,19 @@
 // #![allow(unused_imports)]
 // #![allow(unused_variables)]
+use std::sync::Arc;
+use vulkano::image::{Image, view::ImageView};
+use vulkano::render_pass::{Framebuffer, FramebufferCreateInfo, RenderPass};
 
-mod d_render_context;
+mod app;
 mod myglfw;
-mod struct_my_vertex;
+mod rcx;
+mod shaders;
 mod vertex_buffer;
 mod vulkan;
 
-use crate::d_render_context::App;
-use crate::d_render_context::init_render_context;
+use crate::app::App;
 use crate::myglfw::init_glfw;
+use crate::rcx::init_rcx;
 use crate::vertex_buffer::init_vertex_buffer;
 use crate::vulkan::init_vulkan;
 
@@ -23,7 +27,7 @@ async fn run() {
     // Vulkan is the api that talks to the graphics card
     let (_vulkan, surface, device, queue) = init_vulkan(window.clone());
     let (command_buffer_allocator, vertex_buffer) = init_vertex_buffer(device.clone());
-    let render_context = init_render_context(window.clone(), surface, device.clone());
+    let render_context = init_rcx(window.clone(), surface, device.clone());
 
     let mut myapp = App {
         device,
@@ -46,4 +50,25 @@ async fn run() {
 
         myapp.draw_frame();
     }
+}
+
+pub fn window_size_dependent_setup(
+    images: &[Arc<Image>],
+    render_pass: Arc<RenderPass>,
+) -> Vec<Arc<Framebuffer>> {
+    images
+        .iter()
+        .map(|image| {
+            let view = ImageView::new_default(image.clone()).unwrap();
+
+            Framebuffer::new(
+                render_pass.clone(),
+                FramebufferCreateInfo {
+                    attachments: [view].to_vec(),
+                    ..Default::default()
+                },
+            )
+            .unwrap()
+        })
+        .collect::<Vec<_>>()
 }
