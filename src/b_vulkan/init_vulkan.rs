@@ -7,7 +7,9 @@ use vulkano::{
     swapchain::Surface,
 };
 
-use crate::setup::{init_device, init_surface, init_vulkan_instance::init_vkinstance};
+use crate::b_vulkan::{
+    init_device::init_device, init_surface::init_surface, init_vkinstance::init_vkinstance,
+};
 
 pub fn init_vulkan(window: Arc<PWindow>) -> (Arc<Instance>, Arc<Surface>, Arc<Device>, Arc<Queue>) {
     let required_extensions =

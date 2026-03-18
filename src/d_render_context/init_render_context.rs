@@ -22,9 +22,10 @@ use vulkano::{
 };
 
 use crate::{
-    RenderContext,
-    presentation::{frame_buffer::window_size_dependent_setup, swapchain::init_swapchain},
-    shaders::MyTriangleVertex,
+    c_vertex_buffers::MyTriangleVertex,
+    d_render_context::{
+        render_context::RenderContext, swapchain::init_swapchain, window_size_dependent_setup,
+    },
 };
 
 pub fn init_render_context(
@@ -39,12 +40,10 @@ pub fn init_render_context(
             ty: "vertex",
             src: r"
                 #version 450
-    
                 layout(location = 0) in vec2 position;
                 layout(location = 1) in vec3 color;
-    
                 layout(location = 0) out vec3 v_color;
-    
+                
                 void main() {
                     gl_Position = vec4(position, 0.0, 1.0);
                     v_color = color;
@@ -61,7 +60,7 @@ pub fn init_render_context(
     
                 layout(location = 0) in vec3 v_color;
                 layout(location = 0) out vec4 f_color;
-    
+                
                 void main() {
                     f_color = vec4(v_color, 1.0);
                 }

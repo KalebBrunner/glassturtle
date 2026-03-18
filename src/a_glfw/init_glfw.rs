@@ -1,8 +1,10 @@
+use std::sync::Arc;
+
 use glfw::{ClientApiHint, Glfw, GlfwReceiver, PWindow, WindowHint, fail_on_errors};
 
 pub fn init_glfw() -> (
     Glfw,
-    PWindow,
+    Arc<PWindow>,
     GlfwReceiver<(f64, glfw::WindowEvent)>,
     // InstanceExtensions,
 ) {
@@ -35,6 +37,7 @@ pub fn init_glfw() -> (
     window.set_mouse_button_polling(true);
     window.set_pos_polling(true);
 
-    // let ext = get_required_extensions(&glfw);
-    (glfw, window, events)
+    let arc_window = Arc::new(window);
+
+    (glfw, arc_window, events)
 }
