@@ -24,7 +24,7 @@ pub fn init_vulkan(window: Arc<PWindow>) -> (Arc<Instance>, Arc<Surface>, Arc<De
     (vulkan, surface, device, queue)
 }
 
-fn init_vkinstance(extensions: InstanceExtensions) -> Arc<Instance> {
+pub fn init_vkinstance(extensions: InstanceExtensions) -> Arc<Instance> {
     let library = VulkanLibrary::new().expect("failed to load Vulkan loader");
     println!("Highest Vulkan ver: {:?}", library.api_version());
 
@@ -71,7 +71,7 @@ fn create_validation_layers(library: &Arc<VulkanLibrary>) -> Vec<String> {
     required_layer_names
 }
 
-fn init_device(vulkan: Arc<Instance>) -> (Arc<Device>, Arc<Queue>) {
+pub fn init_device(vulkan: Arc<Instance>) -> (Arc<Device>, Arc<Queue>) {
     let physical_device = init_physical_device(&vulkan);
     let (logical_device, mut queues) = init_logical_device(physical_device.clone());
     let queue = queues.next().unwrap();
@@ -119,6 +119,6 @@ fn init_logical_device(
     }
 }
 
-fn init_surface(vulkan: Arc<Instance>, window: Arc<PWindow>) -> Arc<Surface> {
+pub fn init_surface(vulkan: Arc<Instance>, window: Arc<PWindow>) -> Arc<Surface> {
     Surface::from_window(vulkan, window).expect("failed to create surface")
 }
