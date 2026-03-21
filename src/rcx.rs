@@ -5,6 +5,7 @@ use std::{
     cmp::{max, min},
     sync::Arc,
 };
+use vulkano::device::physical::PhysicalDevice;
 use vulkano::{
     device::Device,
     image::{Image, ImageUsage},
@@ -120,7 +121,10 @@ fn init_pipeline(device: Arc<Device>, render_pass: Arc<RenderPass>) -> Arc<Graph
             // framebuffer. The default value overwrites the old value with the new one,
             // without any blending.
             color_blend_state: Some(ColorBlendState {
-                attachments: vec![ColorBlendAttachmentState::default()],
+                attachments: vec![ColorBlendAttachmentState {
+                    blend: Some(vulkano::pipeline::graphics::color_blend::AttachmentBlend::alpha()),
+                    ..Default::default()
+                }],
                 ..Default::default()
             }),
             // Dynamic states allows us to specify parts of the pipeline settings when
@@ -178,6 +182,11 @@ pub fn init_swapchain(
         .surface_capabilities(surface, Default::default())
         .unwrap();
 
+    println!(
+        "supported composite alpha: {:?}",
+        surface_capabilities.supported_composite_alpha
+    );
+
     let image_extent = surface_capabilities.current_extent.unwrap_or([640, 480]);
 
     let min_image_count = match surface_capabilities.max_image_count {
@@ -187,13 +196,29 @@ pub fn init_swapchain(
 
     let pre_transform = surface_capabilities.current_transform;
 
-    let (image_format, _color_space) = logical_device
+    let (image_format, color_space) = logical_device
         .physical_device()
         .surface_formats(surface, Default::default())
-        .unwrap()[0];
-    let composite_alpha = CompositeAlpha::Inherit;
+        .unwrap()
+        .into_iter()
+        .find(|(format, _)| {
+            matches!(
+                format,
+                vulkano::format::Format::B8G8R8A8_SRGB
+                    | vulkano::format::Format::B8G8R8A8_UNORM
+                    | vulkano::format::Format::R8G8B8A8_SRGB
+                    | vulkano::format::Format::R8G8B8A8_UNORM
+            )
+        })
+        .expect("No alpha-capable surface format found");
     let present_mode = PresentMode::Fifo;
     let full_screen_exclusive = FullScreenExclusive::Default;
+
+    let composite_alpha = surface_capabilities
+        .supported_composite_alpha
+        .into_iter()
+        .find(|mode| matches!(mode, CompositeAlpha::Inherit))
+        .expect("This surface does not support transparent window composition");
 
     let swap_info = SwapchainCreateInfo {
         min_image_count,
@@ -201,6 +226,7 @@ pub fn init_swapchain(
         image_extent,
         image_usage: ImageUsage::COLOR_ATTACHMENT,
         pre_transform,
+        image_color_space: color_space,
         composite_alpha,
         present_mode,
         full_screen_exclusive,

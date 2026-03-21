@@ -84,7 +84,7 @@ impl App {
         builder
             .begin_render_pass(
                 RenderPassBeginInfo {
-                    clear_values: vec![Some([0.0, 0.0, 0.0, 1.0].into())],
+                    clear_values: vec![Some([0.0, 0.0, 0.0, 0.0].into())],
                     ..RenderPassBeginInfo::framebuffer(
                         rcx.framebuffers[image_index as usize].clone(),
                     )
