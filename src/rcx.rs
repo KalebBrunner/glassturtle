@@ -187,7 +187,19 @@ pub fn init_swapchain(
         surface_capabilities.supported_composite_alpha
     );
 
-    let image_extent = surface_capabilities.current_extent.unwrap_or([640, 480]);
+    let mut image_extent = [0 as u32, 0 as u32];
+    if surface_capabilities
+        .current_extent
+        .unwrap()
+        .first()
+        .unwrap()
+        .to_owned()
+        == u32::MAX
+    {
+        panic!("Extents are at max")
+    }
+
+    let image_extent = surface_capabilities.current_extent.unwrap_or([1920, 1080]);
 
     let min_image_count = match surface_capabilities.max_image_count {
         None => max(2, surface_capabilities.min_image_count),

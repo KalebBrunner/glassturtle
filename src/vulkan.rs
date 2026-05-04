@@ -14,27 +14,22 @@ use vulkano::{
 const USE_VALIDATION_LAYERS: bool = true;
 const VALIDATION_LAYERS: [&str; 1] = ["VK_LAYER_KHRONOS_validation"];
 
-pub fn init_vulkan(window: Arc<PWindow>) -> (Arc<Instance>, Arc<Surface>, Arc<Device>, Arc<Queue>) {
-    let required_extensions =
-        Surface::required_extensions(&window).expect("Failed to get required extensions");
+// pub fn init_vulkan(window: Arc<PWindow>) -> (Arc<Instance>, Arc<Surface>, Arc<Device>, Arc<Queue>) {
+//     let required_extensions =
+//         Surface::required_extensions(&window).expect("Failed to get required extensions");
 
-    let vulkan = init_vkinstance(required_extensions);
-    let (device, queue) = init_device(vulkan.clone());
-    let surface = init_surface(vulkan.clone(), window);
-    (vulkan, surface, device, queue)
-}
+//     let vulkan = init_vkinstance(required_extensions);
+//     let (device, queue) = init_device(vulkan.clone());
+//     let surface = init_surface(vulkan.clone(), window);
+//     (vulkan, surface, device, queue)
+// }
 
-pub fn init_vkinstance(extensions: InstanceExtensions) -> Arc<Instance> {
-    let library = VulkanLibrary::new().expect("failed to load Vulkan loader");
-    println!("Highest Vulkan ver: {:?}", library.api_version());
+pub fn init_vkinstance(windowing_extensions: InstanceExtensions) -> Arc<Instance> {
+    let library = VulkanLibrary::new().expect("failed to load Vulkan library");
+    println!("Vulkan ver: {:?}", library.api_version());
 
-    let mut layers = vec![];
-    if USE_VALIDATION_LAYERS {
-        layers = create_validation_layers(&library);
-    }
-
-    println!("Active layers: {:?}", layers);
-    println!("Active extensions: {:?}", extensions);
+    let extensions = collect_extensions(&library, windowing_extensions);
+    let layers = collect_layers(&library);
 
     let create_info = InstanceCreateInfo {
         engine_name: Some("Glass Turtle Graphics".into()),
@@ -48,27 +43,74 @@ pub fn init_vkinstance(extensions: InstanceExtensions) -> Arc<Instance> {
     Instance::new(library, create_info).expect("failed to create Vulkan instance")
 }
 
-fn create_validation_layers(library: &Arc<VulkanLibrary>) -> Vec<String> {
-    let available_layer_names: Vec<String> = library
-        .layer_properties()
-        .unwrap()
-        .map(|layer| layer.name().to_owned())
-        .collect();
+fn collect_extensions(
+    library: &Arc<VulkanLibrary>,
+    minimum: InstanceExtensions,
+) -> InstanceExtensions {
+    let supported = library.supported_extensions();
 
-    let required_layer_names = VALIDATION_LAYERS.map(|layer| layer.to_owned()).to_vec();
+    // Check for minimums
+    if minimum.difference(&supported).count() > 0 {
+        println!("Required extensions: {:?}", minimum);
+        println!("Supported extensions: {:?}", supported);
+        panic!("Windowing surface not supported by vulkan")
+    }
 
-    let missing_layer_names: Vec<_> = required_layer_names
+    let additionally_desired = InstanceExtensions {
+        ext_debug_utils: true,
+        khr_get_surface_capabilities2: true,
+        ext_swapchain_colorspace: true,
+        ..InstanceExtensions::empty()
+    };
+
+    // Check for additional
+    let unavailable = additionally_desired.difference(supported);
+    if unavailable.count() > 0 {
+        println!("Failed to get {:?}", unavailable);
+        panic!("Failed to collect extensions")
+    } else {
+        let active = minimum.union(&additionally_desired);
+        println!("Extensions: {:?}", active);
+        println!("Extensions: minimum and all additional active");
+        return active;
+    }
+}
+
+fn collect_layers(library: &VulkanLibrary) -> Vec<String> {
+    if USE_VALIDATION_LAYERS == false {
+        println!("Validation layers disabled");
+        return Vec::new();
+    }
+
+    let requested_layers: Vec<String> = VALIDATION_LAYERS
         .iter()
-        .filter(|req| !available_layer_names.iter().any(|avail| avail == *req))
+        .map(|layer| layer.to_string())
         .collect();
 
-    assert!(
-        missing_layer_names.is_empty(),
-        "Required Vulkan validation layer(s) not found: {:?}",
-        missing_layer_names,
-    );
+    let available_layers: Vec<String> = library
+        .layer_properties()
+        .expect("Failed to enumerate Vulkan layer properties")
+        .map(|layer| layer.name().to_string())
+        .collect();
 
-    required_layer_names
+    let missing_layers: Vec<&String> = requested_layers
+        .iter()
+        .filter(|requested| {
+            !available_layers
+                .iter()
+                .any(|available| available == *requested)
+        })
+        .collect();
+
+    if missing_layers.is_empty() {
+        println!("Layers: {:?}", requested_layers);
+        println!("Layers: requested only");
+        return requested_layers;
+    } else {
+        println!("Layers Available: {:?}", available_layers);
+        println!("Required Vulkan validation layer(s) not found: {missing_layers:?}");
+        panic!("");
+    }
 }
 
 pub fn init_device(vulkan: Arc<Instance>) -> (Arc<Device>, Arc<Queue>) {
@@ -87,8 +129,9 @@ fn init_physical_device(vulkan: &Arc<Instance>) -> Arc<PhysicalDevice> {
         .nth(device_id)
         .expect("Selected Vulkan physical device not found");
     println!(
-        "Physical name: {:?}",
-        physical_device.properties().device_name
+        "Physical name: {:?} | Type: {:?}",
+        physical_device.properties().device_name,
+        physical_device.properties().device_type
     );
     physical_device
 }
@@ -115,7 +158,7 @@ fn init_logical_device(
         },
     ) {
         Ok(d) => d,
-        Err(err) => panic!("Couldn't build device: {:?}", err),
+        Err(err) => panic!("Could not build device: {:?}", err),
     }
 }
 

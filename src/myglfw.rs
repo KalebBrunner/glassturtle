@@ -23,10 +23,10 @@ pub fn init_glfw() -> (
      */
     // let mut glfw = glfw::init(fail_on_errors!()).unwrap();
     let mut glfw = glfw::init(glfw::log_errors!()).unwrap();
-    glfw.window_hint(WindowHint::TransparentFramebuffer(true));
-    // glfw.window_hint(WindowHint::ClientApi(ClientApiHint::NoApi)); //overrides transparency to false
+    // glfw.window_hint(WindowHint::TransparentFramebuffer(true));
+    glfw.window_hint(WindowHint::ClientApi(ClientApiHint::NoApi)); //overrides transparency to false
 
-    glfw.window_hint(WindowHint::Decorated(false));
+    // glfw.window_hint(WindowHint::Decorated(false));
     glfw.window_hint(WindowHint::MousePassthrough(true));
 
     let (mut window, events) = glfw

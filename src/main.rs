@@ -1,7 +1,8 @@
-// #![allow(unused_imports)]
-// #![allow(unused_variables)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 use std::sync::Arc;
 use vulkano::image::{Image, view::ImageView};
+use vulkano::instance::{InstanceExtensions, InstanceOwned};
 use vulkano::render_pass::{Framebuffer, FramebufferCreateInfo, RenderPass};
 use vulkano::swapchain::Surface;
 
@@ -16,7 +17,7 @@ use crate::app::App;
 use crate::myglfw::init_glfw;
 use crate::rcx::init_rcx;
 use crate::vertex_buffer::init_vertex_buffer;
-use crate::vulkan::{init_device, init_surface, init_vkinstance, init_vulkan};
+use crate::vulkan::{init_device, init_surface, init_vkinstance};
 
 fn main() {
     pollster::block_on(run());
@@ -25,9 +26,10 @@ fn main() {
 async fn run() {
     // GLFW is the window manager api. It stands for Good Luck Fellow Witches
     let (mut glfw, window, events) = init_glfw();
-    let required_extensions =
+    let windowing_extensions =
         Surface::required_extensions(&window).expect("Failed to get required extensions");
-    let vulkan = init_vkinstance(required_extensions);
+
+    let vulkan = init_vkinstance(windowing_extensions);
     let (device, queue) = init_device(vulkan.clone());
     let surface = init_surface(vulkan.clone(), window.clone());
 
