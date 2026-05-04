@@ -30,9 +30,9 @@ async fn run() {
         Surface::required_extensions(&window).expect("Failed to get required extensions");
 
     let vulkan = init_vkinstance(windowing_extensions);
-    let (device, queue) = init_device(vulkan.clone());
     let surface =
         Surface::from_window(vulkan.clone(), window.clone()).expect("failed to create surface");
+    let (device, queue) = init_device(vulkan.clone());
 
     let (command_buffer_allocator, vertex_buffer) = init_vertex_buffer(device.clone());
     let render_context = init_rcx(window.clone(), surface, device.clone());
