@@ -5,12 +5,13 @@ use vulkano::{
     Version, VulkanLibrary,
     device::{
         Device, DeviceCreateInfo, DeviceExtensions, DeviceFeatures, Queue, QueueCreateInfo,
-        physical::PhysicalDevice,
+        QueueFlags, physical::PhysicalDevice,
     },
     instance::{
         Instance, InstanceCreateInfo, InstanceExtensions,
         debug::{DebugUtilsMessenger, DebugUtilsMessengerCallback, DebugUtilsMessengerCreateInfo},
     },
+    pipeline::graphics,
 };
 
 const USE_VALIDATION_LAYERS: bool = true;
@@ -153,16 +154,33 @@ fn init_logical_device(
     physical_device: Arc<PhysicalDevice>,
 ) -> (Arc<Device>, impl ExactSizeIterator<Item = Arc<Queue>>) {
     let features = DeviceFeatures::empty();
+    println!("Device features: {:?}", features);
+
     let extensions = DeviceExtensions {
         khr_swapchain: true,
         ..DeviceExtensions::empty()
     };
+    println!("Device extensions: {:?}", extensions);
+
+    let queue_family_index = physical_device
+        .queue_family_properties()
+        .iter()
+        .enumerate()
+        .position(|(_index, queue_family)| queue_family.queue_flags.contains(QueueFlags::GRAPHICS))
+        .expect("could not find a graphics queue family") as u32;
+    println!(
+        "Device queues: {:?}",
+        physical_device
+            .queue_family_properties()
+            .get(queue_family_index as usize)
+            .unwrap()
+    );
 
     match Device::new(
         physical_device,
         DeviceCreateInfo {
             queue_create_infos: vec![QueueCreateInfo {
-                queue_family_index: 0,
+                queue_family_index,
                 ..Default::default()
             }],
             enabled_extensions: extensions,

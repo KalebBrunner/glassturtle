@@ -1,6 +1,7 @@
 #![allow(unused_imports)]
 #![allow(unused_variables)]
 use std::sync::Arc;
+use vulkano::device::physical;
 use vulkano::image::{Image, view::ImageView};
 use vulkano::instance::{InstanceExtensions, InstanceOwned};
 use vulkano::render_pass::{Framebuffer, FramebufferCreateInfo, RenderPass};
@@ -32,6 +33,7 @@ async fn run() {
     let vulkan = init_vkinstance(windowing_extensions);
     let surface =
         Surface::from_window(vulkan.clone(), window.clone()).expect("failed to create surface");
+
     let (device, queue) = init_device(vulkan.clone());
 
     let (command_buffer_allocator, vertex_buffer) = init_vertex_buffer(device.clone());
