@@ -35,9 +35,9 @@ async fn run() {
         Surface::from_window(vulkan.clone(), window.clone()).expect("failed to create surface");
 
     let (device, queue) = init_device(vulkan.clone());
+    let render_context = init_rcx(window.clone(), surface, device.clone());
 
     let (command_buffer_allocator, vertex_buffer) = init_vertex_buffer(device.clone());
-    let render_context = init_rcx(window.clone(), surface, device.clone());
 
     let mut myapp = App {
         device,
