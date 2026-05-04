@@ -17,7 +17,7 @@ use crate::app::App;
 use crate::myglfw::init_glfw;
 use crate::rcx::init_rcx;
 use crate::vertex_buffer::init_vertex_buffer;
-use crate::vulkan::{init_device, init_surface, init_vkinstance};
+use crate::vulkan::{init_device, init_vkinstance};
 
 fn main() {
     pollster::block_on(run());
@@ -31,7 +31,8 @@ async fn run() {
 
     let vulkan = init_vkinstance(windowing_extensions);
     let (device, queue) = init_device(vulkan.clone());
-    let surface = init_surface(vulkan.clone(), window.clone());
+    let surface =
+        Surface::from_window(vulkan.clone(), window.clone()).expect("failed to create surface");
 
     let (command_buffer_allocator, vertex_buffer) = init_vertex_buffer(device.clone());
     let render_context = init_rcx(window.clone(), surface, device.clone());

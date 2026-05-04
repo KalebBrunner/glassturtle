@@ -7,22 +7,14 @@ use vulkano::{
         Device, DeviceCreateInfo, DeviceExtensions, DeviceFeatures, Queue, QueueCreateInfo,
         physical::PhysicalDevice,
     },
-    instance::{Instance, InstanceCreateInfo, InstanceExtensions},
-    swapchain::Surface,
+    instance::{
+        Instance, InstanceCreateInfo, InstanceExtensions,
+        debug::{DebugUtilsMessenger, DebugUtilsMessengerCallback, DebugUtilsMessengerCreateInfo},
+    },
 };
 
 const USE_VALIDATION_LAYERS: bool = true;
 const VALIDATION_LAYERS: [&str; 1] = ["VK_LAYER_KHRONOS_validation"];
-
-// pub fn init_vulkan(window: Arc<PWindow>) -> (Arc<Instance>, Arc<Surface>, Arc<Device>, Arc<Queue>) {
-//     let required_extensions =
-//         Surface::required_extensions(&window).expect("Failed to get required extensions");
-
-//     let vulkan = init_vkinstance(required_extensions);
-//     let (device, queue) = init_device(vulkan.clone());
-//     let surface = init_surface(vulkan.clone(), window);
-//     (vulkan, surface, device, queue)
-// }
 
 pub fn init_vkinstance(windowing_extensions: InstanceExtensions) -> Arc<Instance> {
     let library = VulkanLibrary::new().expect("failed to load Vulkan library");
@@ -40,7 +32,9 @@ pub fn init_vkinstance(windowing_extensions: InstanceExtensions) -> Arc<Instance
         ..InstanceCreateInfo::application_from_cargo_toml()
     };
 
-    Instance::new(library, create_info).expect("failed to create Vulkan instance")
+    let vulkan = Instance::new(library, create_info).expect("failed to create Vulkan instance");
+    let _debug_messenger = setup_debug_messenger(vulkan.clone());
+    return vulkan;
 }
 
 fn collect_extensions(
@@ -113,6 +107,22 @@ fn collect_layers(library: &VulkanLibrary) -> Vec<String> {
     }
 }
 
+fn setup_debug_messenger(instance: Arc<Instance>) -> DebugUtilsMessenger {
+    if !USE_VALIDATION_LAYERS {
+        panic!("Debug set without validation layers");
+    }
+    let debug_messenger = DebugUtilsMessenger::new(
+        instance,
+        DebugUtilsMessengerCreateInfo::user_callback(unsafe {
+            DebugUtilsMessengerCallback::new(|severity, ty, data| {
+                eprintln!("[Vulkan][{:?}][{:?}] {}", severity, ty, data.message);
+            })
+        }),
+    )
+    .expect("failed to create Vulkan debug messenger");
+    return debug_messenger;
+}
+
 pub fn init_device(vulkan: Arc<Instance>) -> (Arc<Device>, Arc<Queue>) {
     let physical_device = init_physical_device(&vulkan);
     let (logical_device, mut queues) = init_logical_device(physical_device.clone());
@@ -133,6 +143,9 @@ fn init_physical_device(vulkan: &Arc<Instance>) -> Arc<PhysicalDevice> {
         physical_device.properties().device_name,
         physical_device.properties().device_type
     );
+    if physical_device.supported_extensions().khr_swapchain == false {
+        panic!("Device Extension: khr_Swapchain not available on this device");
+    }
     physical_device
 }
 
@@ -160,8 +173,4 @@ fn init_logical_device(
         Ok(d) => d,
         Err(err) => panic!("Could not build device: {:?}", err),
     }
-}
-
-pub fn init_surface(vulkan: Arc<Instance>, window: Arc<PWindow>) -> Arc<Surface> {
-    Surface::from_window(vulkan, window).expect("failed to create surface")
 }
