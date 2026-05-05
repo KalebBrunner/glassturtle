@@ -128,7 +128,8 @@ fn setup_debug_messenger(instance: Arc<Instance>) -> DebugUtilsMessenger {
 pub fn init_device(vulkan: Arc<Instance>, surface: Arc<Surface>) -> (Arc<Device>, Arc<Queue>) {
     let physical_device = init_physical_device(&vulkan);
 
-    let (logical_device, mut queues) = init_logical_device(physical_device.clone());
+    let (logical_device, mut queues) =
+        init_logical_device(physical_device.clone(), surface.clone());
     let queue = queues.next().unwrap();
 
     (logical_device, queue)
@@ -154,6 +155,7 @@ fn init_physical_device(vulkan: &Arc<Instance>) -> Arc<PhysicalDevice> {
 
 fn init_logical_device(
     physical_device: Arc<PhysicalDevice>,
+    surface: Arc<Surface>,
 ) -> (Arc<Device>, impl ExactSizeIterator<Item = Arc<Queue>>) {
     let features = DeviceFeatures::empty();
     println!("Device features: {:?}", features);
@@ -168,7 +170,12 @@ fn init_logical_device(
         .queue_family_properties()
         .iter()
         .enumerate()
-        .position(|(_index, queue_family)| queue_family.queue_flags.contains(QueueFlags::GRAPHICS))
+        .position(|(index, queue_family)| {
+            queue_family.queue_flags.contains(QueueFlags::GRAPHICS)
+                && physical_device
+                    .surface_support(index as u32, &surface)
+                    .unwrap_or(false)
+        })
         .expect("could not find a graphics queue family") as u32;
     // println!(
     //     "Device queues: {:?}",
