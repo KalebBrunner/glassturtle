@@ -1,4 +1,5 @@
 use crate::shaders::{fragment::fs, struct_triangle::MyTriangleVertex, vertex::vs};
+use crate::summary::print_swapchain_support_summary;
 use crate::window_size_dependent_setup;
 use glfw::PWindow;
 use std::{
@@ -6,6 +7,7 @@ use std::{
     sync::Arc,
 };
 use vulkano::device::physical::PhysicalDevice;
+use vulkano::swapchain::SurfaceInfo;
 use vulkano::{
     device::Device,
     image::{Image, ImageUsage},
@@ -181,23 +183,6 @@ pub fn init_swapchain(
         .physical_device()
         .surface_capabilities(surface, Default::default())
         .unwrap();
-
-    println!(
-        "supported composite alpha: {:?}",
-        surface_capabilities.supported_composite_alpha
-    );
-
-    let mut image_extent = [0 as u32, 0 as u32];
-    if surface_capabilities
-        .current_extent
-        .unwrap()
-        .first()
-        .unwrap()
-        .to_owned()
-        == u32::MAX
-    {
-        panic!("Extents are at max")
-    }
 
     let image_extent = surface_capabilities.current_extent.unwrap_or([1920, 1080]);
 

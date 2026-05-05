@@ -11,12 +11,14 @@ mod app;
 mod myglfw;
 mod rcx;
 mod shaders;
+mod summary;
 mod vertex_buffer;
 mod vulkan;
 
 use crate::app::App;
 use crate::myglfw::init_glfw;
 use crate::rcx::init_rcx;
+use crate::summary::print_vulkan_project_summary;
 use crate::vertex_buffer::init_vertex_buffer;
 use crate::vulkan::{init_device, init_vkinstance};
 
@@ -29,13 +31,13 @@ async fn run() {
     let (mut glfw, window, events) = init_glfw();
     let windowing_extensions =
         Surface::required_extensions(&window).expect("Failed to get required extensions");
-
     let vulkan = init_vkinstance(windowing_extensions);
     let surface =
         Surface::from_window(vulkan.clone(), window.clone()).expect("failed to create surface");
+    let (device, queue) = init_device(vulkan.clone(), surface.clone());
 
-    let (device, queue) = init_device(vulkan.clone());
-    let render_context = init_rcx(window.clone(), surface, device.clone());
+    print_vulkan_project_summary(&vulkan, &surface, &device, &queue);
+    let render_context = init_rcx(window.clone(), surface.clone(), device.clone());
 
     let (command_buffer_allocator, vertex_buffer) = init_vertex_buffer(device.clone());
 

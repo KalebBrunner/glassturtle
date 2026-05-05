@@ -12,6 +12,7 @@ use vulkano::{
         debug::{DebugUtilsMessenger, DebugUtilsMessengerCallback, DebugUtilsMessengerCreateInfo},
     },
     pipeline::graphics,
+    swapchain::{Surface, SurfaceInfo},
 };
 
 const USE_VALIDATION_LAYERS: bool = true;
@@ -124,8 +125,9 @@ fn setup_debug_messenger(instance: Arc<Instance>) -> DebugUtilsMessenger {
     return debug_messenger;
 }
 
-pub fn init_device(vulkan: Arc<Instance>) -> (Arc<Device>, Arc<Queue>) {
+pub fn init_device(vulkan: Arc<Instance>, surface: Arc<Surface>) -> (Arc<Device>, Arc<Queue>) {
     let physical_device = init_physical_device(&vulkan);
+
     let (logical_device, mut queues) = init_logical_device(physical_device.clone());
     let queue = queues.next().unwrap();
 
@@ -168,13 +170,13 @@ fn init_logical_device(
         .enumerate()
         .position(|(_index, queue_family)| queue_family.queue_flags.contains(QueueFlags::GRAPHICS))
         .expect("could not find a graphics queue family") as u32;
-    println!(
-        "Device queues: {:?}",
-        physical_device
-            .queue_family_properties()
-            .get(queue_family_index as usize)
-            .unwrap()
-    );
+    // println!(
+    //     "Device queues: {:?}",
+    //     physical_device
+    //         .queue_family_properties()
+    //         .get(queue_family_index as usize)
+    //         .unwrap()
+    // );
 
     match Device::new(
         physical_device,
