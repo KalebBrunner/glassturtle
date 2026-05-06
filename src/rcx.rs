@@ -30,8 +30,7 @@ use vulkano::{
     },
     sync::{self, GpuFuture},
 };
-pub struct MyRenderContext {
-    pub window: Arc<glfw::PWindow>,
+pub struct RCX {
     pub swapchain: Arc<Swapchain>,
     pub render_pass: Arc<RenderPass>,
     pub framebuffers: Vec<Arc<Framebuffer>>,
@@ -41,21 +40,22 @@ pub struct MyRenderContext {
     pub previous_frame_end: Option<Box<dyn GpuFuture>>,
 }
 
-pub fn init_rcx(
-    window: Arc<PWindow>,
-    surface: Arc<Surface>,
-    device: Arc<Device>,
-) -> MyRenderContext {
+pub fn init_rcx(surface: Arc<Surface>, device: Arc<Device>) -> RCX {
     let (swapchain, swapchain_images) = init_swapchain(&surface, device.clone());
+
     let render_pass = init_renderpass(device.clone(), &swapchain);
+
     let pipeline = init_pipeline(device.clone(), render_pass.clone());
+
     let framebuffers = window_size_dependent_setup(&swapchain_images, render_pass.clone());
+
     let previous_frame_end = Some(sync::now(device.clone()).boxed());
+
     let viewport = init_viewport(&swapchain);
+
     let recreate_swapchain = false;
 
-    MyRenderContext {
-        window,
+    RCX {
         swapchain,
         render_pass,
         pipeline,

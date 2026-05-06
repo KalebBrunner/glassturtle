@@ -11,16 +11,17 @@ use vulkano::{
     sync::{self, GpuFuture},
 };
 
-use crate::rcx::MyRenderContext;
+use crate::rcx::RCX;
 use crate::shaders::struct_triangle::MyTriangleVertex;
 use crate::window_size_dependent_setup;
 
 pub struct App {
+    pub window: Arc<glfw::PWindow>,
     pub device: Arc<Device>,
     pub queue: Arc<Queue>,
     pub command_buffer_allocator: Arc<StandardCommandBufferAllocator>,
     pub vertex_buffer: Subbuffer<[MyTriangleVertex]>,
-    pub render_context: Option<MyRenderContext>,
+    pub render_context: Option<RCX>,
 }
 
 impl App {
@@ -31,7 +32,7 @@ impl App {
         rcx.previous_frame_end.as_mut().unwrap().cleanup_finished();
 
         if rcx.recreate_swapchain {
-            let image_extent = rcx.window.get_framebuffer_size();
+            let image_extent = self.window.get_framebuffer_size();
             if image_extent.0 == 0 || image_extent.1 == 0 {
                 return;
             }

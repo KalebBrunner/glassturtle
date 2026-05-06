@@ -35,13 +35,14 @@ async fn run() {
     let surface =
         Surface::from_window(vulkan.clone(), window.clone()).expect("failed to create surface");
     let (device, queue) = init_device(vulkan.clone(), surface.clone());
-
     print_vulkan_project_summary(&vulkan, &surface, &device, &queue);
-    let render_context = init_rcx(window.clone(), surface.clone(), device.clone());
+
+    let render_context = init_rcx(surface.clone(), device.clone());
 
     let (command_buffer_allocator, vertex_buffer) = init_vertex_buffer(device.clone());
 
     let mut myapp = App {
+        window,
         device,
         queue,
         command_buffer_allocator,
@@ -49,7 +50,7 @@ async fn run() {
         render_context: Some(render_context),
     };
 
-    while !window.clone().should_close() {
+    while !myapp.window.clone().should_close() {
         glfw.poll_events();
 
         for (_, event) in glfw::flush_messages(&events) {
