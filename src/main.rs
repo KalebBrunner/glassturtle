@@ -65,7 +65,7 @@ async fn run() {
     }
 }
 
-pub fn window_size_dependent_setup(
+pub fn create_framebuffers(
     images: &[Arc<Image>],
     render_pass: Arc<RenderPass>,
 ) -> Vec<Arc<Framebuffer>> {

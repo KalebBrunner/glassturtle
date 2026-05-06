@@ -1,6 +1,6 @@
+use crate::create_framebuffers;
 use crate::shaders::{fragment::fs, struct_triangle::MyTriangleVertex, vertex::vs};
 use crate::summary::print_swapchain_support_summary;
-use crate::window_size_dependent_setup;
 use glfw::PWindow;
 use std::{
     cmp::{max, min},
@@ -30,7 +30,7 @@ use vulkano::{
     },
     sync::{self, GpuFuture},
 };
-pub struct RCX {
+pub struct RenderContext {
     pub swapchain: Arc<Swapchain>,
     pub render_pass: Arc<RenderPass>,
     pub framebuffers: Vec<Arc<Framebuffer>>,
@@ -40,28 +40,28 @@ pub struct RCX {
     pub previous_frame_end: Option<Box<dyn GpuFuture>>,
 }
 
-pub fn init_rcx(surface: Arc<Surface>, device: Arc<Device>) -> RCX {
+pub fn init_rcx(surface: Arc<Surface>, device: Arc<Device>) -> RenderContext {
     let (swapchain, swapchain_images) = init_swapchain(&surface, device.clone());
+
+    let viewport = init_viewport(&swapchain);
 
     let render_pass = init_renderpass(device.clone(), &swapchain);
 
     let pipeline = init_pipeline(device.clone(), render_pass.clone());
 
-    let framebuffers = window_size_dependent_setup(&swapchain_images, render_pass.clone());
+    let framebuffers = create_framebuffers(&swapchain_images, render_pass.clone());
 
     let previous_frame_end = Some(sync::now(device.clone()).boxed());
 
-    let viewport = init_viewport(&swapchain);
-
     let recreate_swapchain = false;
 
-    RCX {
+    RenderContext {
         swapchain,
+        viewport,
         render_pass,
         pipeline,
         framebuffers,
         previous_frame_end,
-        viewport,
         recreate_swapchain,
     }
 }

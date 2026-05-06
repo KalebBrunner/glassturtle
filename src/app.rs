@@ -11,9 +11,9 @@ use vulkano::{
     sync::{self, GpuFuture},
 };
 
-use crate::rcx::RCX;
+use crate::create_framebuffers;
+use crate::rcx::RenderContext;
 use crate::shaders::struct_triangle::MyTriangleVertex;
-use crate::window_size_dependent_setup;
 
 pub struct App {
     pub window: Arc<glfw::PWindow>,
@@ -21,43 +21,20 @@ pub struct App {
     pub queue: Arc<Queue>,
     pub command_buffer_allocator: Arc<StandardCommandBufferAllocator>,
     pub vertex_buffer: Subbuffer<[MyTriangleVertex]>,
-    pub render_context: Option<RCX>,
+    pub render_context: Option<RenderContext>,
 }
 
 impl App {
     pub fn draw_frame(&mut self) {
         let rcx = self.render_context.as_mut().unwrap();
 
-        // 1) clean up old GPU work
         rcx.previous_frame_end.as_mut().unwrap().cleanup_finished();
 
         if rcx.recreate_swapchain {
             let image_extent = self.window.get_framebuffer_size();
-            if image_extent.0 == 0 || image_extent.1 == 0 {
-                return;
-            }
-
-            let (new_swapchain, new_images) = rcx
-                .swapchain
-                .recreate(vulkano::swapchain::SwapchainCreateInfo {
-                    image_extent: [image_extent.0 as u32, image_extent.1 as u32],
-                    ..rcx.swapchain.create_info()
-                })
-                .expect("failed to recreate swapchain");
-
-            rcx.swapchain = new_swapchain;
-            rcx.framebuffers = window_size_dependent_setup(&new_images, rcx.render_pass.clone());
-
-            rcx.viewport = Viewport {
-                offset: [0.0, 0.0],
-                extent: [image_extent.0 as f32, image_extent.1 as f32],
-                depth_range: 0.0..=1.0,
-            };
-
-            rcx.recreate_swapchain = false;
+            recreate_swapchain(rcx, image_extent);
         }
 
-        // 2) acquire next swapchain image
         let (image_index, suboptimal, acquire_future) =
             match swapchain::acquire_next_image(rcx.swapchain.clone(), None)
                 .map_err(vulkano::Validated::unwrap)
@@ -74,7 +51,6 @@ impl App {
             rcx.recreate_swapchain = true;
         }
 
-        // 3) record commands for this frame
         let mut builder = AutoCommandBufferBuilder::primary(
             self.command_buffer_allocator.clone(),
             self.queue.queue_family_index(),
@@ -109,7 +85,6 @@ impl App {
 
         let command_buffer = builder.build().unwrap();
 
-        // 4) submit + 5) present
         let future = rcx
             .previous_frame_end
             .take()
@@ -136,4 +111,30 @@ impl App {
             }
         });
     }
+}
+
+pub fn recreate_swapchain(rcx: &mut RenderContext, image_extent: (i32, i32)) {
+    if image_extent.0 == 0 || image_extent.1 == 0 {
+        println!("RCX: Window is minimized");
+        return;
+    }
+
+    let (new_swapchain, new_images) = rcx
+        .swapchain
+        .recreate(vulkano::swapchain::SwapchainCreateInfo {
+            image_extent: [image_extent.0 as u32, image_extent.1 as u32],
+            ..rcx.swapchain.create_info()
+        })
+        .expect("failed to recreate swapchain");
+
+    rcx.swapchain = new_swapchain;
+    rcx.framebuffers = create_framebuffers(&new_images, rcx.render_pass.clone());
+
+    rcx.viewport = Viewport {
+        offset: [0.0, 0.0],
+        extent: [image_extent.0 as f32, image_extent.1 as f32],
+        depth_range: 0.0..=1.0,
+    };
+
+    rcx.recreate_swapchain = false;
 }
