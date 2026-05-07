@@ -6,6 +6,7 @@ use vulkano::{
         SubpassContents, SubpassEndInfo, allocator::StandardCommandBufferAllocator,
     },
     device::{Device, Queue},
+    image::SampleCount,
     pipeline::graphics::viewport::Viewport,
     swapchain::{self, SwapchainPresentInfo},
     sync::{self, GpuFuture},
@@ -21,6 +22,7 @@ pub struct App {
     pub command_buffer_allocator: Arc<StandardCommandBufferAllocator>,
     pub vertex_buffer: Subbuffer<[MyTriangleVertex]>,
     pub render_context: Option<RenderContext>,
+    pub sample_count_index: usize,
 }
 
 impl App {
@@ -112,6 +114,23 @@ impl App {
                 sync::now(self.device.clone()).boxed()
             }
         });
+    }
+
+    const SAMPLE_COUNTS: [SampleCount; 5] = [
+        SampleCount::Sample1,
+        SampleCount::Sample2,
+        SampleCount::Sample4,
+        SampleCount::Sample8,
+        SampleCount::Sample16,
+    ];
+
+    pub fn cycle_sample_count(&mut self, direction: i32) {
+        let len = Self::SAMPLE_COUNTS.len() as i32;
+        self.sample_count_index =
+            ((self.sample_count_index as i32 + direction).rem_euclid(len)) as usize;
+        let new_count = Self::SAMPLE_COUNTS[self.sample_count_index];
+        println!("Sample count: {:?}", new_count);
+        // rebuild rcx here next
     }
 }
 

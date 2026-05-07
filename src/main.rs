@@ -51,16 +51,26 @@ async fn run() {
         command_buffer_allocator,
         vertex_buffer,
         render_context: Some(render_context),
+        sample_count_index: 4,
     };
 
     while !myapp.window.clone().should_close() {
         glfw.poll_events();
 
         for (_, event) in glfw::flush_messages(&events) {
-            if let glfw::WindowEvent::FramebufferSize(_, _) = event
-                && let Some(rcx) = myapp.render_context.as_mut()
-            {
-                rcx.recreate_swapchain = true;
+            match event {
+                glfw::WindowEvent::FramebufferSize(_, _) => {
+                    if let Some(rcx) = myapp.render_context.as_mut() {
+                        rcx.recreate_swapchain = true;
+                    }
+                }
+                glfw::WindowEvent::Key(glfw::Key::Right, _, glfw::Action::Press, _) => {
+                    myapp.cycle_sample_count(1);
+                }
+                glfw::WindowEvent::Key(glfw::Key::Left, _, glfw::Action::Press, _) => {
+                    myapp.cycle_sample_count(-1);
+                }
+                _ => {}
             }
         }
 

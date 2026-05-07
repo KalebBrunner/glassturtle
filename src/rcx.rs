@@ -167,7 +167,11 @@ fn init_pipeline(device: Arc<Device>, render_pass: Arc<RenderPass>) -> Arc<Graph
     }
 }
 
-fn init_renderpass(device: Arc<Device>, swapchain: &Arc<Swapchain>) -> Arc<RenderPass> {
+fn init_renderpass(
+    device: Arc<Device>,
+    swapchain: &Arc<Swapchain>,
+    sample_count: SampleCount,
+) -> Arc<RenderPass> {
     vulkano::single_pass_renderpass!(
         device,
         attachments: {
@@ -176,7 +180,7 @@ fn init_renderpass(device: Arc<Device>, swapchain: &Arc<Swapchain>) -> Arc<Rende
             // only the resolved result matters
             msaa_color: {
                 format: swapchain.image_format(),
-                samples: 16,
+                samples: sample_count,
                 load_op: Clear,
                 store_op: DontCare,
             },
