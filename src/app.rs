@@ -11,7 +11,6 @@ use vulkano::{
     sync::{self, GpuFuture},
 };
 
-use crate::create_framebuffers;
 use crate::rcx::RenderContext;
 use crate::shaders::struct_triangle::MyTriangleVertex;
 

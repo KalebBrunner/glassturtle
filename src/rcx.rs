@@ -7,6 +7,8 @@ use std::{
     sync::Arc,
 };
 use vulkano::device::physical::PhysicalDevice;
+use vulkano::image::SampleCount;
+use vulkano::render_pass::{AttachmentDescription, AttachmentLoadOp, AttachmentStoreOp};
 use vulkano::swapchain::SurfaceInfo;
 use vulkano::{
     device::Device,
@@ -103,6 +105,11 @@ fn init_pipeline(device: Arc<Device>, render_pass: Arc<RenderPass>) -> Arc<Graph
         .unwrap();
         let subpass = Subpass::from(render_pass.clone(), 0).unwrap();
 
+        let msstate = MultisampleState {
+            rasterization_samples: SampleCount::Sample16,
+            ..Default::default()
+        };
+
         let graphics_pipeline_info = GraphicsPipelineCreateInfo {
             stages: stages.into(),
             // How vertex data is read from the vertex buffers into the vertex shader.
@@ -118,7 +125,7 @@ fn init_pipeline(device: Arc<Device>, render_pass: Arc<RenderPass>) -> Arc<Graph
             rasterization_state: Some(RasterizationState::default()),
             // How multiple fragment shader samples are converted to a single pixel value.
             // The default value does not perform any multisampling.
-            multisample_state: Some(MultisampleState::default()),
+            multisample_state: Some(msstate),
             // How pixel values are combined with the values already present in the
             // framebuffer. The default value overwrites the old value with the new one,
             // without any blending.
@@ -145,30 +152,27 @@ fn init_renderpass(device: Arc<Device>, swapchain: &Arc<Swapchain>) -> Arc<Rende
     vulkano::single_pass_renderpass!(
         device,
         attachments: {
-            // `color` is a custom name we give to the first and only attachment.
-            color: {
-                // `format: <ty>` indicates the type of the format of the image. This has to be
-                // one of the types of the `vulkano::format` module (or alternatively one of
-                // your structs that implements the `FormatDesc` trait). Here we use the same
-                // format as the swapchain.
+            // The multisample image we render into - note samples: 4
+            // store_op: DontCare because we never need to read this back,
+            // only the resolved result matters
+            msaa_color: {
                 format: swapchain.image_format(),
-                // `samples: 1` means that we ask the GPU to use one sample to determine the
-                // value of each pixel in the color attachment. We could use a larger value
-                // (multisampling) for antialiasing. An example of this can be found in
-                // msaa-renderpass.rs.
-                samples: 1,
-                // `load_op: Clear` means that we ask the GPU to clear the content of this
-                // attachment at the start of the drawing.
+                samples: 16,
                 load_op: Clear,
-                // `store_op: Store` means that we ask the GPU to store the output of the draw
-                // in the actual image. We could also ask it to discard the result.
+                store_op: DontCare,
+            },
+            // The resolve target - this IS the swapchain image
+            // load_op: DontCare because we're going to overwrite every pixel via resolve
+            color: {
+                format: swapchain.image_format(),
+                samples: 1,
+                load_op: DontCare,
                 store_op: Store,
             },
         },
         pass: {
-            // We use the attachment named `color` as the one and only color attachment.
-            color: [color],
-            // No depth-stencil attachment is indicated with empty brackets.
+            color: [msaa_color],
+            color_resolve: [color],
             depth_stencil: {},
         },
     )

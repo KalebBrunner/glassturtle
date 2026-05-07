@@ -4,18 +4,21 @@ use vulkano::{
     buffer::{Buffer, BufferCreateInfo, BufferUsage, Subbuffer},
     command_buffer::allocator::StandardCommandBufferAllocator,
     device::Device,
-    memory::allocator::{AllocationCreateInfo, MemoryTypeFilter, StandardMemoryAllocator},
+    memory::allocator::{
+        AllocationCreateInfo, FreeListAllocator, GenericMemoryAllocator, MemoryTypeFilter,
+        StandardMemoryAllocator,
+    },
 };
 
 use crate::shaders::struct_triangle::MyTriangleVertex;
 
 pub fn init_vertex_buffer(
     device: Arc<Device>,
+    memory_allocator: Arc<GenericMemoryAllocator<FreeListAllocator>>,
 ) -> (
     Arc<StandardCommandBufferAllocator>,
     Subbuffer<[MyTriangleVertex]>,
 ) {
-    let memory_allocator = Arc::new(StandardMemoryAllocator::new_default(device.clone()));
     let command_buffer_allocator = Arc::new(StandardCommandBufferAllocator::new(
         device.clone(),
         Default::default(),

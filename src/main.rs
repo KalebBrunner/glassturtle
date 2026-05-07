@@ -4,6 +4,7 @@ use std::sync::Arc;
 use vulkano::device::physical;
 use vulkano::image::{Image, view::ImageView};
 use vulkano::instance::{InstanceExtensions, InstanceOwned};
+use vulkano::memory::allocator::StandardMemoryAllocator;
 use vulkano::render_pass::{Framebuffer, FramebufferCreateInfo, RenderPass};
 use vulkano::swapchain::Surface;
 
@@ -38,8 +39,9 @@ async fn run() {
     print_vulkan_project_summary(&vulkan, &surface, &device, &queue);
 
     let render_context = init_rcx(surface.clone(), device.clone());
-
-    let (command_buffer_allocator, vertex_buffer) = init_vertex_buffer(device.clone());
+    let memory_allocator = Arc::new(StandardMemoryAllocator::new_default(device.clone()));
+    let (command_buffer_allocator, vertex_buffer) =
+        init_vertex_buffer(device.clone(), memory_allocator);
 
     let mut myapp = App {
         window,
@@ -63,25 +65,4 @@ async fn run() {
 
         myapp.draw_frame();
     }
-}
-
-pub fn create_framebuffers(
-    images: &[Arc<Image>],
-    render_pass: Arc<RenderPass>,
-) -> Vec<Arc<Framebuffer>> {
-    images
-        .iter()
-        .map(|image| {
-            let view = ImageView::new_default(image.clone()).unwrap();
-
-            Framebuffer::new(
-                render_pass.clone(),
-                FramebufferCreateInfo {
-                    attachments: [view].to_vec(),
-                    ..Default::default()
-                },
-            )
-            .unwrap()
-        })
-        .collect::<Vec<_>>()
 }
