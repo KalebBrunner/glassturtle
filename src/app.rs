@@ -11,7 +11,7 @@ use vulkano::{
     sync::{self, GpuFuture},
 };
 
-use crate::rcx::RenderContext;
+use crate::rcx::{RenderContext, build_msaa_framebuffers, create_msaa_image};
 use crate::shaders::struct_triangle::MyTriangleVertex;
 
 pub struct App {
@@ -60,7 +60,10 @@ impl App {
         builder
             .begin_render_pass(
                 RenderPassBeginInfo {
-                    clear_values: vec![Some([0.0, 0.0, 0.0, 0.0].into())],
+                    clear_values: vec![
+                        Some([0.0, 0.0, 0.0, 0.0].into()), // msaa attachment: gets cleared
+                        None, // swapchain resolve target: load_op is DontCare
+                    ],
                     ..RenderPassBeginInfo::framebuffer(
                         rcx.framebuffers[image_index as usize].clone(),
                     )
@@ -127,7 +130,12 @@ pub fn recreate_swapchain(rcx: &mut RenderContext, image_extent: (i32, i32)) {
         .expect("failed to recreate swapchain");
 
     rcx.swapchain = new_swapchain;
-    rcx.framebuffers = create_framebuffers(&new_images, rcx.render_pass.clone());
+    rcx.msaa_image_view = create_msaa_image(rcx.memory_allocator.clone(), &rcx.swapchain);
+    rcx.framebuffers = build_msaa_framebuffers(
+        &new_images,
+        rcx.render_pass.clone(),
+        rcx.msaa_image_view.clone(),
+    );
 
     rcx.viewport = Viewport {
         offset: [0.0, 0.0],

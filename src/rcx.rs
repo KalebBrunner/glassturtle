@@ -1,4 +1,3 @@
-use crate::create_framebuffers;
 use crate::shaders::{fragment::fs, struct_triangle::MyTriangleVertex, vertex::vs};
 use crate::summary::print_swapchain_support_summary;
 use glfw::PWindow;
@@ -7,8 +6,14 @@ use std::{
     sync::Arc,
 };
 use vulkano::device::physical::PhysicalDevice;
-use vulkano::image::SampleCount;
-use vulkano::render_pass::{AttachmentDescription, AttachmentLoadOp, AttachmentStoreOp};
+use vulkano::image::view::ImageView;
+use vulkano::image::{ImageCreateInfo, ImageLayout, ImageType, SampleCount};
+use vulkano::memory::allocator::{
+    AllocationCreateInfo, FreeListAllocator, GenericMemoryAllocator, StandardMemoryAllocator,
+};
+use vulkano::render_pass::{
+    AttachmentDescription, AttachmentLoadOp, AttachmentStoreOp, FramebufferCreateInfo,
+};
 use vulkano::swapchain::SurfaceInfo;
 use vulkano::{
     device::Device,
@@ -33,16 +38,22 @@ use vulkano::{
     sync::{self, GpuFuture},
 };
 pub struct RenderContext {
+    pub memory_allocator: Arc<StandardMemoryAllocator>,
     pub swapchain: Arc<Swapchain>,
     pub render_pass: Arc<RenderPass>,
     pub framebuffers: Vec<Arc<Framebuffer>>,
     pub pipeline: Arc<GraphicsPipeline>,
+    pub msaa_image_view: Arc<ImageView>,
     pub viewport: Viewport,
     pub recreate_swapchain: bool,
     pub previous_frame_end: Option<Box<dyn GpuFuture>>,
 }
 
-pub fn init_rcx(surface: Arc<Surface>, device: Arc<Device>) -> RenderContext {
+pub fn init_rcx(
+    surface: Arc<Surface>,
+    device: Arc<Device>,
+    memory_allocator: Arc<GenericMemoryAllocator<FreeListAllocator>>,
+) -> RenderContext {
     let (swapchain, swapchain_images) = init_swapchain(&surface, device.clone());
 
     let viewport = init_viewport(&swapchain);
@@ -51,17 +62,25 @@ pub fn init_rcx(surface: Arc<Surface>, device: Arc<Device>) -> RenderContext {
 
     let pipeline = init_pipeline(device.clone(), render_pass.clone());
 
-    let framebuffers = create_framebuffers(&swapchain_images, render_pass.clone());
+    let msaa_image_view = create_msaa_image(memory_allocator.clone(), &swapchain);
+
+    let framebuffers = build_msaa_framebuffers(
+        &swapchain_images,
+        render_pass.clone(),
+        msaa_image_view.clone(),
+    );
 
     let previous_frame_end = Some(sync::now(device.clone()).boxed());
 
     let recreate_swapchain = false;
 
     RenderContext {
+        memory_allocator,
         swapchain,
         viewport,
         render_pass,
         pipeline,
+        msaa_image_view,
         framebuffers,
         previous_frame_end,
         recreate_swapchain,
@@ -168,6 +187,8 @@ fn init_renderpass(device: Arc<Device>, swapchain: &Arc<Swapchain>) -> Arc<Rende
                 samples: 1,
                 load_op: DontCare,
                 store_op: Store,
+                initial_layout: ImageLayout::Undefined,
+                final_layout: ImageLayout::PresentSrc,
             },
         },
         pass: {
@@ -225,7 +246,7 @@ pub fn init_swapchain(
         min_image_count,
         image_format,
         image_extent,
-        image_usage: ImageUsage::COLOR_ATTACHMENT,
+        image_usage: ImageUsage::COLOR_ATTACHMENT | ImageUsage::TRANSFER_DST,
         pre_transform,
         image_color_space: color_space,
         composite_alpha,
@@ -238,4 +259,48 @@ pub fn init_swapchain(
         Swapchain::new(logical_device.clone(), surface.clone(), swap_info).unwrap();
 
     (swapchain, images)
+}
+pub fn create_msaa_image(
+    memory_allocator: Arc<StandardMemoryAllocator>,
+    swapchain: &Arc<Swapchain>,
+) -> Arc<ImageView> {
+    let image_extent = swapchain.image_extent();
+    let msaa_image = Image::new(
+        memory_allocator,
+        ImageCreateInfo {
+            image_type: ImageType::Dim2d,
+            format: swapchain.image_format(),
+            extent: [image_extent[0], image_extent[1], 1],
+            samples: SampleCount::Sample16,
+            usage: ImageUsage::COLOR_ATTACHMENT | ImageUsage::TRANSIENT_ATTACHMENT,
+            ..Default::default()
+        },
+        AllocationCreateInfo::default(),
+    )
+    .unwrap();
+    ImageView::new_default(msaa_image).unwrap()
+}
+
+pub fn build_msaa_framebuffers(
+    images: &[Arc<Image>],
+    render_pass: Arc<RenderPass>,
+    msaa_image_view: Arc<ImageView>,
+) -> Vec<Arc<Framebuffer>> {
+    images
+        .iter()
+        .map(|image| {
+            let swapchain_view = ImageView::new_default(image.clone()).unwrap();
+            Framebuffer::new(
+                render_pass.clone(),
+                FramebufferCreateInfo {
+                    attachments: vec![
+                        msaa_image_view.clone(), // attachment 0: render into this
+                        swapchain_view,          // attachment 1: resolve into this
+                    ],
+                    ..Default::default()
+                },
+            )
+            .unwrap()
+        })
+        .collect()
 }

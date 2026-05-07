@@ -38,10 +38,11 @@ async fn run() {
     let (device, queue) = init_device(vulkan.clone(), surface.clone());
     print_vulkan_project_summary(&vulkan, &surface, &device, &queue);
 
-    let render_context = init_rcx(surface.clone(), device.clone());
     let memory_allocator = Arc::new(StandardMemoryAllocator::new_default(device.clone()));
+
+    let render_context = init_rcx(surface.clone(), device.clone(), memory_allocator.clone());
     let (command_buffer_allocator, vertex_buffer) =
-        init_vertex_buffer(device.clone(), memory_allocator);
+        init_vertex_buffer(device.clone(), memory_allocator.clone());
 
     let mut myapp = App {
         window,
