@@ -40,6 +40,7 @@ use vulkano::{
 pub struct RenderContext {
     pub memory_allocator: Arc<StandardMemoryAllocator>,
     pub swapchain: Arc<Swapchain>,
+    pub swapchain_images: Vec<Arc<Image>>,
     pub render_pass: Arc<RenderPass>,
     pub framebuffers: Vec<Arc<Framebuffer>>,
     pub pipeline: Arc<GraphicsPipeline>,
@@ -47,22 +48,24 @@ pub struct RenderContext {
     pub viewport: Viewport,
     pub recreate_swapchain: bool,
     pub previous_frame_end: Option<Box<dyn GpuFuture>>,
+    pub sample_count: SampleCount,
 }
 
 pub fn init_rcx(
     surface: Arc<Surface>,
     device: Arc<Device>,
     memory_allocator: Arc<GenericMemoryAllocator<FreeListAllocator>>,
+    sample_count: SampleCount,
 ) -> RenderContext {
     let (swapchain, swapchain_images) = init_swapchain(&surface, device.clone());
 
     let viewport = init_viewport(&swapchain);
 
-    let render_pass = init_renderpass(device.clone(), &swapchain);
+    let render_pass = init_renderpass(device.clone(), &swapchain, sample_count);
 
-    let pipeline = init_pipeline(device.clone(), render_pass.clone());
+    let pipeline = init_pipeline(device.clone(), render_pass.clone(), sample_count);
 
-    let msaa_image_view = create_msaa_image(memory_allocator.clone(), &swapchain);
+    let msaa_image_view = create_msaa_image(memory_allocator.clone(), &swapchain, sample_count);
 
     let framebuffers = build_msaa_framebuffers(
         &swapchain_images,
@@ -77,6 +80,7 @@ pub fn init_rcx(
     RenderContext {
         memory_allocator,
         swapchain,
+        swapchain_images,
         viewport,
         render_pass,
         pipeline,
@@ -84,6 +88,7 @@ pub fn init_rcx(
         framebuffers,
         previous_frame_end,
         recreate_swapchain,
+        sample_count,
     }
 }
 
@@ -97,7 +102,11 @@ fn init_viewport(swapchain: &Arc<Swapchain>) -> Viewport {
     }
 }
 
-fn init_pipeline(device: Arc<Device>, render_pass: Arc<RenderPass>) -> Arc<GraphicsPipeline> {
+pub fn init_pipeline(
+    device: Arc<Device>,
+    render_pass: Arc<RenderPass>,
+    sample_count: SampleCount,
+) -> Arc<GraphicsPipeline> {
     {
         let vs = vs::load(device.clone())
             .unwrap()
@@ -125,7 +134,7 @@ fn init_pipeline(device: Arc<Device>, render_pass: Arc<RenderPass>) -> Arc<Graph
         let subpass = Subpass::from(render_pass.clone(), 0).unwrap();
 
         let msstate = MultisampleState {
-            rasterization_samples: SampleCount::Sample16,
+            rasterization_samples: sample_count,
             ..Default::default()
         };
 
@@ -167,7 +176,7 @@ fn init_pipeline(device: Arc<Device>, render_pass: Arc<RenderPass>) -> Arc<Graph
     }
 }
 
-fn init_renderpass(
+pub fn init_renderpass(
     device: Arc<Device>,
     swapchain: &Arc<Swapchain>,
     sample_count: SampleCount,
@@ -267,6 +276,7 @@ pub fn init_swapchain(
 pub fn create_msaa_image(
     memory_allocator: Arc<StandardMemoryAllocator>,
     swapchain: &Arc<Swapchain>,
+    sample_count: SampleCount,
 ) -> Arc<ImageView> {
     let image_extent = swapchain.image_extent();
     let msaa_image = Image::new(
@@ -275,7 +285,7 @@ pub fn create_msaa_image(
             image_type: ImageType::Dim2d,
             format: swapchain.image_format(),
             extent: [image_extent[0], image_extent[1], 1],
-            samples: SampleCount::Sample16,
+            samples: sample_count,
             usage: ImageUsage::COLOR_ATTACHMENT | ImageUsage::TRANSIENT_ATTACHMENT,
             ..Default::default()
         },

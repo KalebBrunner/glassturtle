@@ -128,6 +128,12 @@ fn setup_debug_messenger(instance: Arc<Instance>) -> DebugUtilsMessenger {
 pub fn init_device(vulkan: Arc<Instance>, surface: Arc<Surface>) -> (Arc<Device>, Arc<Queue>) {
     let physical_device = init_physical_device(&vulkan);
 
+    println!(
+        "Sample counts: {:?}",
+        physical_device
+            .properties()
+            .framebuffer_no_attachments_sample_counts
+    );
     let (logical_device, mut queues) =
         init_logical_device(physical_device.clone(), surface.clone());
     let queue = queues.next().unwrap();

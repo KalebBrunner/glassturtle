@@ -2,6 +2,7 @@
 #![allow(unused_variables)]
 use std::sync::Arc;
 use vulkano::device::physical;
+use vulkano::image::SampleCount;
 use vulkano::image::{Image, view::ImageView};
 use vulkano::instance::{InstanceExtensions, InstanceOwned};
 use vulkano::memory::allocator::StandardMemoryAllocator;
@@ -40,7 +41,12 @@ async fn run() {
 
     let memory_allocator = Arc::new(StandardMemoryAllocator::new_default(device.clone()));
 
-    let render_context = init_rcx(surface.clone(), device.clone(), memory_allocator.clone());
+    let render_context = init_rcx(
+        surface.clone(),
+        device.clone(),
+        memory_allocator.clone(),
+        SampleCount::Sample8,
+    );
     let (command_buffer_allocator, vertex_buffer) =
         init_vertex_buffer(device.clone(), memory_allocator.clone());
 

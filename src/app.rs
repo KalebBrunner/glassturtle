@@ -12,7 +12,9 @@ use vulkano::{
     sync::{self, GpuFuture},
 };
 
-use crate::rcx::{RenderContext, build_msaa_framebuffers, create_msaa_image};
+use crate::rcx::{
+    RenderContext, build_msaa_framebuffers, create_msaa_image, init_pipeline, init_renderpass,
+};
 use crate::shaders::struct_triangle::MyTriangleVertex;
 
 pub struct App {
@@ -116,8 +118,8 @@ impl App {
         });
     }
 
-    const SAMPLE_COUNTS: [SampleCount; 5] = [
-        SampleCount::Sample1,
+    const SAMPLE_COUNTS: [SampleCount; 4] = [
+        // SampleCount::Sample1,
         SampleCount::Sample2,
         SampleCount::Sample4,
         SampleCount::Sample8,
@@ -130,7 +132,22 @@ impl App {
             ((self.sample_count_index as i32 + direction).rem_euclid(len)) as usize;
         let new_count = Self::SAMPLE_COUNTS[self.sample_count_index];
         println!("Sample count: {:?}", new_count);
-        // rebuild rcx here next
+
+        let rcx = self.render_context.as_mut().unwrap();
+        rcx.previous_frame_end.as_mut().unwrap().cleanup_finished();
+        // wait for gpu to be idle before rebuilding
+        self.queue.with(|mut q| q.wait_idle()).unwrap();
+
+        rcx.sample_count = new_count;
+        rcx.render_pass = init_renderpass(self.device.clone(), &rcx.swapchain, new_count);
+        rcx.pipeline = init_pipeline(self.device.clone(), rcx.render_pass.clone(), new_count);
+        rcx.msaa_image_view =
+            create_msaa_image(rcx.memory_allocator.clone(), &rcx.swapchain, new_count);
+        rcx.framebuffers = build_msaa_framebuffers(
+            &rcx.swapchain_images.clone(),
+            rcx.render_pass.clone(),
+            rcx.msaa_image_view.clone(),
+        );
     }
 }
 
@@ -149,13 +166,17 @@ pub fn recreate_swapchain(rcx: &mut RenderContext, image_extent: (i32, i32)) {
         .expect("failed to recreate swapchain");
 
     rcx.swapchain = new_swapchain;
-    rcx.msaa_image_view = create_msaa_image(rcx.memory_allocator.clone(), &rcx.swapchain);
+    rcx.swapchain_images = new_images;
+    rcx.msaa_image_view = create_msaa_image(
+        rcx.memory_allocator.clone(),
+        &rcx.swapchain,
+        rcx.sample_count,
+    );
     rcx.framebuffers = build_msaa_framebuffers(
-        &new_images,
+        &rcx.swapchain_images.clone(),
         rcx.render_pass.clone(),
         rcx.msaa_image_view.clone(),
     );
-
     rcx.viewport = Viewport {
         offset: [0.0, 0.0],
         extent: [image_extent.0 as f32, image_extent.1 as f32],
