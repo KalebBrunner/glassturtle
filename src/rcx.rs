@@ -7,6 +7,7 @@ use std::{
     sync::Arc,
 };
 use vulkano::device::physical::PhysicalDevice;
+use vulkano::format::Format;
 use vulkano::swapchain::SurfaceInfo;
 use vulkano::{
     device::Device,
@@ -43,13 +44,19 @@ pub struct RenderContext {
 pub fn init_rcx(surface: Arc<Surface>, device: Arc<Device>) -> RenderContext {
     let (swapchain, swapchain_images) = init_swapchain(&surface, device.clone());
 
-    let viewport = init_viewport(&swapchain);
+    let image_extent = swapchain.image_extent();
 
-    let render_pass = init_renderpass(device.clone(), &swapchain);
+    let viewport = Viewport {
+        offset: [0.0, 0.0],
+        extent: [image_extent[0] as f32, image_extent[1] as f32],
+        depth_range: 0.0..=1.0,
+    };
 
-    let pipeline = init_pipeline(device.clone(), render_pass.clone());
+    let render_pass = init_renderpass(device.clone(), swapchain.image_format());
 
     let framebuffers = create_framebuffers(&swapchain_images, render_pass.clone());
+
+    let pipeline = init_pipeline(device.clone(), render_pass.clone());
 
     let previous_frame_end = Some(sync::now(device.clone()).boxed());
 
@@ -63,16 +70,6 @@ pub fn init_rcx(surface: Arc<Surface>, device: Arc<Device>) -> RenderContext {
         framebuffers,
         previous_frame_end,
         recreate_swapchain,
-    }
-}
-
-fn init_viewport(swapchain: &Arc<Swapchain>) -> Viewport {
-    let image_extent = swapchain.image_extent();
-
-    Viewport {
-        offset: [0.0, 0.0],
-        extent: [image_extent[0] as f32, image_extent[1] as f32],
-        depth_range: 0.0..=1.0,
     }
 }
 
@@ -141,7 +138,7 @@ fn init_pipeline(device: Arc<Device>, render_pass: Arc<RenderPass>) -> Arc<Graph
     }
 }
 
-fn init_renderpass(device: Arc<Device>, swapchain: &Arc<Swapchain>) -> Arc<RenderPass> {
+fn init_renderpass(device: Arc<Device>, format: Format) -> Arc<RenderPass> {
     vulkano::single_pass_renderpass!(
         device,
         attachments: {
@@ -151,7 +148,7 @@ fn init_renderpass(device: Arc<Device>, swapchain: &Arc<Swapchain>) -> Arc<Rende
                 // one of the types of the `vulkano::format` module (or alternatively one of
                 // your structs that implements the `FormatDesc` trait). Here we use the same
                 // format as the swapchain.
-                format: swapchain.image_format(),
+                format: format,
                 // `samples: 1` means that we ask the GPU to use one sample to determine the
                 // value of each pixel in the color attachment. We could use a larger value
                 // (multisampling) for antialiasing. An example of this can be found in
