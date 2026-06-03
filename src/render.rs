@@ -1,18 +1,28 @@
-use crate::create_framebuffers;
+use crate::camera::Camera;
+use crate::shaders::mesh_vertex::CameraUniform;
 use crate::shaders::{fragment::fs, mesh_vertex::MeshVertex, vertex::vs};
 use std::{
     cmp::{max, min},
     sync::Arc,
 };
+use vulkano::buffer::{Buffer, BufferCreateInfo, BufferUsage};
+use vulkano::descriptor_set::allocator::StandardDescriptorSetAllocator;
+use vulkano::descriptor_set::{DescriptorSet, WriteDescriptorSet};
+use vulkano::device::Device;
 use vulkano::format::Format;
+use vulkano::image::view::ImageView;
+use vulkano::image::{ImageCreateInfo, ImageType};
+use vulkano::memory::allocator::{AllocationCreateInfo, MemoryTypeFilter, StandardMemoryAllocator};
+use vulkano::pipeline::Pipeline;
+use vulkano::render_pass::FramebufferCreateInfo;
 use vulkano::{
-    device::Device,
     image::{Image, ImageUsage},
     pipeline::{
         DynamicState, GraphicsPipeline, PipelineLayout, PipelineShaderStageCreateInfo,
         graphics::{
             GraphicsPipelineCreateInfo,
             color_blend::{ColorBlendAttachmentState, ColorBlendState},
+            depth_stencil::{CompareOp, DepthState, DepthStencilState},
             input_assembly::InputAssemblyState,
             multisample::MultisampleState,
             rasterization::RasterizationState,
@@ -27,6 +37,7 @@ use vulkano::{
     },
     sync::{self, GpuFuture},
 };
+
 pub struct RenderContext {
     pub swapchain: Arc<Swapchain>,
     pub render_pass: Arc<RenderPass>,
@@ -35,6 +46,50 @@ pub struct RenderContext {
     pub viewport: Viewport,
     pub recreate_swapchain: bool,
     pub previous_frame_end: Option<Box<dyn GpuFuture>>,
+    pub descriptor_set_allocator: Arc<StandardDescriptorSetAllocator>,
+}
+
+impl RenderContext {
+    pub fn create_camera_descriptor_set(
+        &self,
+        device: Arc<Device>,
+        camera: &Camera,
+    ) -> Arc<DescriptorSet> {
+        let aspect = self.viewport.extent[0] / self.viewport.extent[1];
+
+        let camera_uniform = CameraUniform {
+            world_to_clip: camera.world_to_clip(aspect).to_cols_array_2d(),
+        };
+
+        let memory_allocator = Arc::new(StandardMemoryAllocator::new_default(device.clone()));
+
+        let uniform_buffer = Buffer::from_data(
+            memory_allocator,
+            BufferCreateInfo {
+                usage: BufferUsage::UNIFORM_BUFFER,
+                ..Default::default()
+            },
+            AllocationCreateInfo {
+                memory_type_filter: MemoryTypeFilter::PREFER_HOST
+                    | MemoryTypeFilter::HOST_SEQUENTIAL_WRITE,
+                ..Default::default()
+            },
+            camera_uniform,
+        )
+        .unwrap();
+
+        let layout = self.pipeline.layout().set_layouts().get(0).unwrap().clone();
+
+        let descriptor_set = DescriptorSet::new(
+            self.descriptor_set_allocator.clone(),
+            layout,
+            [WriteDescriptorSet::buffer(0, uniform_buffer)],
+            [],
+        )
+        .unwrap();
+
+        return descriptor_set;
+    }
 }
 
 pub fn create_render_context(surface: Arc<Surface>, device: Arc<Device>) -> RenderContext {
@@ -50,13 +105,18 @@ pub fn create_render_context(surface: Arc<Surface>, device: Arc<Device>) -> Rend
 
     let render_pass = create_renderpass(device.clone(), swapchain.image_format());
 
-    let framebuffers = create_framebuffers(&swapchain_images, render_pass.clone());
+    let framebuffers = create_framebuffers(device.clone(), &swapchain_images, render_pass.clone());
 
     let pipeline = create_pipeline(device.clone(), render_pass.clone());
 
     let previous_frame_end = Some(sync::now(device.clone()).boxed());
 
     let recreate_swapchain = false;
+
+    let descriptor_set_allocator = Arc::new(StandardDescriptorSetAllocator::new(
+        device.clone(),
+        Default::default(),
+    ));
 
     RenderContext {
         swapchain,
@@ -66,6 +126,7 @@ pub fn create_render_context(surface: Arc<Surface>, device: Arc<Device>) -> Rend
         framebuffers,
         previous_frame_end,
         recreate_swapchain,
+        descriptor_set_allocator,
     }
 }
 
@@ -98,28 +159,23 @@ fn create_pipeline(device: Arc<Device>, render_pass: Arc<RenderPass>) -> Arc<Gra
 
         let graphics_pipeline_info = GraphicsPipelineCreateInfo {
             stages: stages.into(),
-            // How vertex data is read from the vertex buffers into the vertex shader.
             vertex_input_state: Some(vertex_input_state),
-            // How vertices are arranged into primitive shapes. The default primitive shape
-            // is a triangle.
             input_assembly_state: Some(InputAssemblyState::default()),
-            // How primitives are transformed and clipped to fit the framebuffer. We use a
-            // resizable viewport, set to draw over the entire window.
             viewport_state: Some(ViewportState::default()),
-            // How polygons are culled and converted into a raster of pixels. The default
-            // value does not perform any culling.
             rasterization_state: Some(RasterizationState::default()),
-            // How multiple fragment shader samples are converted to a single pixel value.
-            // The default value does not perform any multisampling.
             multisample_state: Some(MultisampleState::default()),
-            // How pixel values are combined with the values already present in the
-            // framebuffer. The default value overwrites the old value with the new one,
-            // without any blending.
             color_blend_state: Some(ColorBlendState {
                 attachments: vec![ColorBlendAttachmentState {
                     blend: Some(vulkano::pipeline::graphics::color_blend::AttachmentBlend::alpha()),
                     ..Default::default()
                 }],
+                ..Default::default()
+            }),
+            depth_stencil_state: Some(DepthStencilState {
+                depth: Some(DepthState {
+                    write_enable: true,
+                    compare_op: CompareOp::Less,
+                }),
                 ..Default::default()
             }),
             // Dynamic states allows us to specify parts of the pipeline settings when
@@ -140,29 +196,21 @@ fn create_renderpass(device: Arc<Device>, format: Format) -> Arc<RenderPass> {
         attachments: {
             // `color` is a custom name we give to the first and only attachment.
             color: {
-                // `format: <ty>` indicates the type of the format of the image. This has to be
-                // one of the types of the `vulkano::format` module (or alternatively one of
-                // your structs that implements the `FormatDesc` trait). Here we use the same
-                // format as the swapchain.
                 format: format,
-                // `samples: 1` means that we ask the GPU to use one sample to determine the
-                // value of each pixel in the color attachment. We could use a larger value
-                // (multisampling) for antialiasing. An example of this can be found in
-                // msaa-renderpass.rs.
                 samples: 1,
-                // `load_op: Clear` means that we ask the GPU to clear the content of this
-                // attachment at the start of the drawing.
                 load_op: Clear,
-                // `store_op: Store` means that we ask the GPU to store the output of the draw
-                // in the actual image. We could also ask it to discard the result.
                 store_op: Store,
             },
+            depth: {
+                format: Format::D32_SFLOAT,
+                samples: 1,
+                load_op: Clear,
+                store_op: DontCare,
+            }
         },
         pass: {
-            // We use the attachment named `color` as the one and only color attachment.
             color: [color],
-            // No depth-stencil attachment is indicated with empty brackets.
-            depth_stencil: {},
+            depth_stencil: {depth},
         },
     )
     .unwrap()
@@ -227,4 +275,43 @@ pub fn create_swapchain(
         Swapchain::new(logical_device.clone(), surface.clone(), swap_info).unwrap();
 
     (swapchain, images)
+}
+
+pub fn create_framebuffers(
+    device: Arc<Device>,
+    images: &[Arc<Image>],
+    render_pass: Arc<RenderPass>,
+) -> Vec<Arc<Framebuffer>> {
+    let memory_allocator = Arc::new(StandardMemoryAllocator::new_default(device));
+
+    images
+        .iter()
+        .map(|image| {
+            let color_view = ImageView::new_default(image.clone()).unwrap();
+
+            let depth_image = Image::new(
+                memory_allocator.clone(),
+                ImageCreateInfo {
+                    image_type: ImageType::Dim2d,
+                    format: Format::D32_SFLOAT,
+                    extent: [image.extent()[0], image.extent()[1], 1],
+                    usage: ImageUsage::DEPTH_STENCIL_ATTACHMENT,
+                    ..Default::default()
+                },
+                AllocationCreateInfo::default(),
+            )
+            .unwrap();
+
+            let depth_view = ImageView::new_default(depth_image).unwrap();
+
+            Framebuffer::new(
+                render_pass.clone(),
+                FramebufferCreateInfo {
+                    attachments: vec![color_view, depth_view],
+                    ..Default::default()
+                },
+            )
+            .unwrap()
+        })
+        .collect()
 }

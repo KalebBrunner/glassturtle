@@ -9,3 +9,9 @@ pub struct MeshVertex {
     #[format(R32G32B32_SFLOAT)]
     pub color: [f32; 3],
 }
+
+#[derive(BufferContents, Clone, Copy)]
+#[repr(C)]
+pub struct CameraUniform {
+    pub world_to_clip: [[f32; 4]; 4],
+}

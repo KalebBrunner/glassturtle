@@ -1,17 +1,20 @@
 use std::sync::Arc;
 use vulkano::{
+    buffer::{Buffer, BufferCreateInfo, BufferUsage},
     command_buffer::{
         AutoCommandBufferBuilder, CommandBufferUsage, RenderPassBeginInfo, SubpassBeginInfo,
         SubpassContents, SubpassEndInfo, allocator::StandardCommandBufferAllocator,
     },
+    descriptor_set::{DescriptorSet, WriteDescriptorSet},
     device::{Device, Queue},
-    pipeline::graphics::viewport::Viewport,
+    memory::allocator::{AllocationCreateInfo, MemoryTypeFilter, StandardMemoryAllocator},
+    pipeline::{Pipeline, graphics::viewport::Viewport},
     swapchain::{self, SwapchainPresentInfo},
     sync::{self, GpuFuture},
 };
 
-use crate::render::RenderContext;
-use crate::{create_framebuffers, mesh::Mesh};
+use crate::{camera::Camera, render::RenderContext, shaders::mesh_vertex::CameraUniform};
+use crate::{mesh::Mesh, render::create_framebuffers};
 
 pub struct App {
     pub window: Arc<glfw::PWindow>,
@@ -19,18 +22,19 @@ pub struct App {
     pub queue: Arc<Queue>,
     pub command_buffer_allocator: Arc<StandardCommandBufferAllocator>,
     pub mesh: Mesh,
-    pub render_context: Option<RenderContext>,
+    pub render_context: RenderContext,
+    pub camera: Camera,
 }
 
 impl App {
     pub fn draw_frame(&mut self) {
-        let rcx = self.render_context.as_mut().unwrap();
+        let rcx = &mut self.render_context;
 
         rcx.previous_frame_end.as_mut().unwrap().cleanup_finished();
 
         if rcx.recreate_swapchain {
             let image_extent = self.window.get_framebuffer_size();
-            recreate_swapchain(rcx, image_extent);
+            recreate_swapchain(rcx, self.device.clone(), image_extent);
         }
 
         let (image_index, suboptimal, acquire_future) =
@@ -49,6 +53,8 @@ impl App {
             rcx.recreate_swapchain = true;
         }
 
+        let descriptor_set = rcx.create_camera_descriptor_set(self.device.clone(), &self.camera);
+
         let mut builder = AutoCommandBufferBuilder::primary(
             self.command_buffer_allocator.clone(),
             self.queue.queue_family_index(),
@@ -59,7 +65,7 @@ impl App {
         builder
             .begin_render_pass(
                 RenderPassBeginInfo {
-                    clear_values: vec![Some([0.0, 0.0, 0.0, 0.0].into())],
+                    clear_values: vec![Some([0.0, 0.0, 0.0, 0.0].into()), Some(1.0f32.into())],
                     ..RenderPassBeginInfo::framebuffer(
                         rcx.framebuffers[image_index as usize].clone(),
                     )
@@ -75,6 +81,13 @@ impl App {
             .set_viewport(0, [rcx.viewport.clone()].into_iter().collect())
             .unwrap()
             .bind_vertex_buffers(0, self.mesh.vertex_buffer.clone())
+            .unwrap()
+            .bind_descriptor_sets(
+                vulkano::pipeline::PipelineBindPoint::Graphics,
+                rcx.pipeline.layout().clone(),
+                0,
+                descriptor_set,
+            )
             .unwrap();
 
         unsafe { builder.draw(self.mesh.vertex_buffer.len() as u32, 1, 0, 0) }.unwrap();
@@ -111,7 +124,7 @@ impl App {
     }
 }
 
-pub fn recreate_swapchain(rcx: &mut RenderContext, image_extent: (i32, i32)) {
+pub fn recreate_swapchain(rcx: &mut RenderContext, device: Arc<Device>, image_extent: (i32, i32)) {
     if image_extent.0 == 0 || image_extent.1 == 0 {
         println!("RCX: Window is minimized");
         return;
@@ -126,7 +139,7 @@ pub fn recreate_swapchain(rcx: &mut RenderContext, image_extent: (i32, i32)) {
         .expect("failed to recreate swapchain");
 
     rcx.swapchain = new_swapchain;
-    rcx.framebuffers = create_framebuffers(&new_images, rcx.render_pass.clone());
+    rcx.framebuffers = create_framebuffers(device.clone(), &new_images, rcx.render_pass.clone());
 
     rcx.viewport = Viewport {
         offset: [0.0, 0.0],

@@ -7,6 +7,7 @@ use vulkano::render_pass::{Framebuffer, FramebufferCreateInfo, RenderPass};
 use vulkano::swapchain::Surface;
 
 mod app;
+mod camera;
 mod diagnostics_print;
 mod mesh;
 mod render;
@@ -15,6 +16,7 @@ mod vulkan;
 mod windower;
 
 use crate::app::App;
+use crate::camera::Camera;
 use crate::diagnostics_print::print_diagnostics;
 
 use crate::mesh::create_mesh;
@@ -46,47 +48,27 @@ async fn run() {
 
     let mesh = create_mesh(device.clone());
 
+    let camera = Camera::new();
+
     let mut myapp = App {
         window,
         device,
         queue,
         command_buffer_allocator,
         mesh,
-        render_context: Some(render_context),
+        render_context: render_context,
+        camera,
     };
 
     while !myapp.window.clone().should_close() {
         glfw.poll_events();
 
         for (_, event) in glfw::flush_messages(&events) {
-            if let glfw::WindowEvent::FramebufferSize(_, _) = event
-                && let Some(rcx) = myapp.render_context.as_mut()
-            {
-                rcx.recreate_swapchain = true;
+            if let glfw::WindowEvent::FramebufferSize(_, _) = event {
+                myapp.render_context.recreate_swapchain = true;
             }
         }
 
         myapp.draw_frame();
     }
-}
-
-pub fn create_framebuffers(
-    images: &[Arc<Image>],
-    render_pass: Arc<RenderPass>,
-) -> Vec<Arc<Framebuffer>> {
-    images
-        .iter()
-        .map(|image| {
-            let view = ImageView::new_default(image.clone()).unwrap();
-
-            Framebuffer::new(
-                render_pass.clone(),
-                FramebufferCreateInfo {
-                    attachments: [view].to_vec(),
-                    ..Default::default()
-                },
-            )
-            .unwrap()
-        })
-        .collect::<Vec<_>>()
 }
