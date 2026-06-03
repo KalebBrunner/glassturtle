@@ -9,6 +9,7 @@ use vulkano::swapchain::Surface;
 mod app;
 mod camera;
 mod diagnostics_print;
+mod keybinds;
 mod mesh;
 mod render;
 mod shaders;
@@ -67,6 +68,8 @@ async fn run() {
             if let glfw::WindowEvent::FramebufferSize(_, _) = event {
                 myapp.render_context.recreate_swapchain = true;
             }
+
+            keybinds::handle_keybinds(&event, &mut myapp.camera);
         }
 
         myapp.draw_frame();

@@ -28,4 +28,17 @@ impl Camera {
 
         projection * view
     }
+
+    pub fn orbit_y(&mut self, angle: f32) {
+        let offset = self.eye - self.target;
+        let rotated = Mat4::from_rotation_y(angle).transform_vector3(offset);
+        self.eye = self.target + rotated;
+    }
+
+    pub fn orbit_x(&mut self, angle: f32) {
+        let offset = self.eye - self.target;
+        let right = offset.cross(self.up).normalize();
+        let rotated = Mat4::from_axis_angle(right, angle).transform_vector3(offset);
+        self.eye = self.target + rotated;
+    }
 }
