@@ -1,5 +1,5 @@
 use crate::create_framebuffers;
-use crate::shaders::{fragment::fs, struct_triangle::MyTriangleVertex, vertex::vs};
+use crate::shaders::{fragment::fs, struct_triangle::MeshVertex, vertex::vs};
 use crate::summary::print_swapchain_support_summary;
 use glfw::PWindow;
 use std::{
@@ -84,7 +84,7 @@ fn init_pipeline(device: Arc<Device>, render_pass: Arc<RenderPass>) -> Arc<Graph
             .entry_point("main")
             .unwrap();
 
-        let vertex_input_state = MyTriangleVertex::per_vertex().definition(&vs).unwrap();
+        let vertex_input_state = MeshVertex::per_vertex().definition(&vs).unwrap();
 
         let stages = vec![
             PipelineShaderStageCreateInfo::new(vs),

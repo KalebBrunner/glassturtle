@@ -7,21 +7,14 @@ use vulkano::{
     memory::allocator::{AllocationCreateInfo, MemoryTypeFilter, StandardMemoryAllocator},
 };
 
-use crate::shaders::struct_triangle::MyTriangleVertex;
+use crate::shaders::struct_triangle::MeshVertex;
 
-pub fn init_vertex_buffer(
-    device: Arc<Device>,
-) -> (
-    Arc<StandardCommandBufferAllocator>,
-    Subbuffer<[MyTriangleVertex]>,
-) {
+pub struct Mesh {
+    pub vertex_buffer: Subbuffer<[MeshVertex]>,
+}
+
+pub fn init_mesh(device: Arc<Device>) -> Mesh {
     let memory_allocator = Arc::new(StandardMemoryAllocator::new_default(device.clone()));
-    let command_buffer_allocator = Arc::new(StandardCommandBufferAllocator::new(
-        device.clone(),
-        Default::default(),
-    ));
-
-    // We now create a buffer that will store the shape of our triangle.
     let vertices = make_sine_ribbon();
     let vertex_buffer = Buffer::from_iter(
         memory_allocator,
@@ -38,10 +31,10 @@ pub fn init_vertex_buffer(
     )
     .unwrap();
 
-    (command_buffer_allocator, vertex_buffer)
+    Mesh { vertex_buffer }
 }
 
-fn make_sine_ribbon() -> Vec<MyTriangleVertex> {
+fn make_sine_ribbon() -> Vec<MeshVertex> {
     let mut vertices = Vec::new();
 
     let samples = 80;
@@ -64,19 +57,19 @@ fn make_sine_ribbon() -> Vec<MyTriangleVertex> {
         let c0 = [t0, 0.2, 1.0 - t0];
         let c1 = [t1, 0.2, 1.0 - t1];
 
-        let top0 = MyTriangleVertex {
+        let top0 = MeshVertex {
             position: [x0, y0 + thickness],
             color: c0,
         };
-        let bottom0 = MyTriangleVertex {
+        let bottom0 = MeshVertex {
             position: [x0, y0 - thickness],
             color: c0,
         };
-        let top1 = MyTriangleVertex {
+        let top1 = MeshVertex {
             position: [x1, y1 + thickness],
             color: c1,
         };
-        let bottom1 = MyTriangleVertex {
+        let bottom1 = MeshVertex {
             position: [x1, y1 - thickness],
             color: c1,
         };

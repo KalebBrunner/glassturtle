@@ -1,25 +1,27 @@
 #![allow(unused_imports)]
 #![allow(unused_variables)]
 use std::sync::Arc;
+use vulkano::command_buffer::allocator::StandardCommandBufferAllocator;
 use vulkano::device::physical;
 use vulkano::image::{Image, view::ImageView};
 use vulkano::instance::{InstanceExtensions, InstanceOwned};
+use vulkano::memory::allocator::StandardMemoryAllocator;
 use vulkano::render_pass::{Framebuffer, FramebufferCreateInfo, RenderPass};
 use vulkano::swapchain::Surface;
 
 mod app;
+mod mesh;
 mod myglfw;
 mod rcx;
 mod shaders;
 mod summary;
-mod vertex_buffer;
 mod vulkan;
 
 use crate::app::App;
+use crate::mesh::init_mesh;
 use crate::myglfw::init_glfw;
 use crate::rcx::init_rcx;
 use crate::summary::print_vulkan_project_summary;
-use crate::vertex_buffer::init_vertex_buffer;
 use crate::vulkan::{init_device, init_vkinstance};
 
 fn main() {
@@ -39,14 +41,19 @@ async fn run() {
 
     let render_context = init_rcx(surface.clone(), device.clone());
 
-    let (command_buffer_allocator, vertex_buffer) = init_vertex_buffer(device.clone());
+    let command_buffer_allocator = Arc::new(StandardCommandBufferAllocator::new(
+        device.clone(),
+        Default::default(),
+    ));
+
+    let mesh = init_mesh(device.clone());
 
     let mut myapp = App {
         window,
         device,
         queue,
         command_buffer_allocator,
-        vertex_buffer,
+        mesh,
         render_context: Some(render_context),
     };
 

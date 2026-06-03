@@ -11,16 +11,16 @@ use vulkano::{
     sync::{self, GpuFuture},
 };
 
-use crate::create_framebuffers;
 use crate::rcx::RenderContext;
-use crate::shaders::struct_triangle::MyTriangleVertex;
+use crate::shaders::struct_triangle::MeshVertex;
+use crate::{create_framebuffers, mesh::Mesh};
 
 pub struct App {
     pub window: Arc<glfw::PWindow>,
     pub device: Arc<Device>,
     pub queue: Arc<Queue>,
     pub command_buffer_allocator: Arc<StandardCommandBufferAllocator>,
-    pub vertex_buffer: Subbuffer<[MyTriangleVertex]>,
+    pub mesh: Mesh,
     pub render_context: Option<RenderContext>,
 }
 
@@ -76,10 +76,10 @@ impl App {
             .unwrap()
             .set_viewport(0, [rcx.viewport.clone()].into_iter().collect())
             .unwrap()
-            .bind_vertex_buffers(0, self.vertex_buffer.clone())
+            .bind_vertex_buffers(0, self.mesh.vertex_buffer.clone())
             .unwrap();
 
-        unsafe { builder.draw(self.vertex_buffer.len() as u32, 1, 0, 0) }.unwrap();
+        unsafe { builder.draw(self.mesh.vertex_buffer.len() as u32, 1, 0, 0) }.unwrap();
 
         builder.end_render_pass(SubpassEndInfo::default()).unwrap();
 
