@@ -2,18 +2,17 @@ use std::sync::Arc;
 
 use vulkano::{
     buffer::{Buffer, BufferCreateInfo, BufferUsage, Subbuffer},
-    command_buffer::allocator::StandardCommandBufferAllocator,
     device::Device,
     memory::allocator::{AllocationCreateInfo, MemoryTypeFilter, StandardMemoryAllocator},
 };
 
-use crate::shaders::struct_triangle::MeshVertex;
+use crate::shaders::mesh_vertex::MeshVertex;
 
 pub struct Mesh {
     pub vertex_buffer: Subbuffer<[MeshVertex]>,
 }
 
-pub fn init_mesh(device: Arc<Device>) -> Mesh {
+pub fn create_mesh(device: Arc<Device>) -> Mesh {
     let memory_allocator = Arc::new(StandardMemoryAllocator::new_default(device.clone()));
     let vertices = make_sine_ribbon();
     let vertex_buffer = Buffer::from_iter(

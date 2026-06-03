@@ -3,10 +3,10 @@ use std::sync::Arc;
 use vulkano::{
     device::{Device, Queue, QueueFlags},
     instance::Instance,
-    swapchain::{CompositeAlpha, CompositeAlphas, PresentMode, Surface, SurfaceInfo},
+    swapchain::{Surface, SurfaceInfo},
 };
 
-pub fn print_vulkan_project_summary(
+pub fn print_diagnostics(
     instance: &Arc<Instance>,
     surface: &Arc<Surface>,
     device: &Arc<Device>,

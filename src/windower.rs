@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
-use glfw::{ClientApiHint, Glfw, GlfwReceiver, PWindow, WindowHint, fail_on_errors, log_errors};
+use glfw::{ClientApiHint, Glfw, GlfwReceiver, PWindow, WindowHint, log_errors};
 
-pub fn init_glfw() -> (
+pub fn create_window() -> (
     Glfw,
     Arc<PWindow>,
     GlfwReceiver<(f64, glfw::WindowEvent)>,

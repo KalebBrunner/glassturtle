@@ -1,3 +1,3 @@
 pub mod fragment;
-pub mod struct_triangle;
+pub mod mesh_vertex;
 pub mod vertex;

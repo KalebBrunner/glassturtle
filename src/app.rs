@@ -1,6 +1,5 @@
 use std::sync::Arc;
 use vulkano::{
-    buffer::Subbuffer,
     command_buffer::{
         AutoCommandBufferBuilder, CommandBufferUsage, RenderPassBeginInfo, SubpassBeginInfo,
         SubpassContents, SubpassEndInfo, allocator::StandardCommandBufferAllocator,
@@ -11,8 +10,7 @@ use vulkano::{
     sync::{self, GpuFuture},
 };
 
-use crate::rcx::RenderContext;
-use crate::shaders::struct_triangle::MeshVertex;
+use crate::render::RenderContext;
 use crate::{create_framebuffers, mesh::Mesh};
 
 pub struct App {

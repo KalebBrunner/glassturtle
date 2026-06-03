@@ -1,14 +1,10 @@
 use crate::create_framebuffers;
-use crate::shaders::{fragment::fs, struct_triangle::MeshVertex, vertex::vs};
-use crate::summary::print_swapchain_support_summary;
-use glfw::PWindow;
+use crate::shaders::{fragment::fs, mesh_vertex::MeshVertex, vertex::vs};
 use std::{
     cmp::{max, min},
     sync::Arc,
 };
-use vulkano::device::physical::PhysicalDevice;
 use vulkano::format::Format;
-use vulkano::swapchain::SurfaceInfo;
 use vulkano::{
     device::Device,
     image::{Image, ImageUsage},
@@ -41,8 +37,8 @@ pub struct RenderContext {
     pub previous_frame_end: Option<Box<dyn GpuFuture>>,
 }
 
-pub fn init_rcx(surface: Arc<Surface>, device: Arc<Device>) -> RenderContext {
-    let (swapchain, swapchain_images) = init_swapchain(&surface, device.clone());
+pub fn create_render_context(surface: Arc<Surface>, device: Arc<Device>) -> RenderContext {
+    let (swapchain, swapchain_images) = create_swapchain(&surface, device.clone());
 
     let image_extent = swapchain.image_extent();
 
@@ -52,11 +48,11 @@ pub fn init_rcx(surface: Arc<Surface>, device: Arc<Device>) -> RenderContext {
         depth_range: 0.0..=1.0,
     };
 
-    let render_pass = init_renderpass(device.clone(), swapchain.image_format());
+    let render_pass = create_renderpass(device.clone(), swapchain.image_format());
 
     let framebuffers = create_framebuffers(&swapchain_images, render_pass.clone());
 
-    let pipeline = init_pipeline(device.clone(), render_pass.clone());
+    let pipeline = create_pipeline(device.clone(), render_pass.clone());
 
     let previous_frame_end = Some(sync::now(device.clone()).boxed());
 
@@ -73,7 +69,7 @@ pub fn init_rcx(surface: Arc<Surface>, device: Arc<Device>) -> RenderContext {
     }
 }
 
-fn init_pipeline(device: Arc<Device>, render_pass: Arc<RenderPass>) -> Arc<GraphicsPipeline> {
+fn create_pipeline(device: Arc<Device>, render_pass: Arc<RenderPass>) -> Arc<GraphicsPipeline> {
     {
         let vs = vs::load(device.clone())
             .unwrap()
@@ -138,7 +134,7 @@ fn init_pipeline(device: Arc<Device>, render_pass: Arc<RenderPass>) -> Arc<Graph
     }
 }
 
-fn init_renderpass(device: Arc<Device>, format: Format) -> Arc<RenderPass> {
+fn create_renderpass(device: Arc<Device>, format: Format) -> Arc<RenderPass> {
     vulkano::single_pass_renderpass!(
         device,
         attachments: {
@@ -172,7 +168,7 @@ fn init_renderpass(device: Arc<Device>, format: Format) -> Arc<RenderPass> {
     .unwrap()
 }
 
-pub fn init_swapchain(
+pub fn create_swapchain(
     surface: &Arc<Surface>,
     logical_device: Arc<Device>,
 ) -> (Arc<Swapchain>, Vec<Arc<Image>>) {

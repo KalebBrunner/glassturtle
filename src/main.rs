@@ -2,27 +2,25 @@
 #![allow(unused_variables)]
 use std::sync::Arc;
 use vulkano::command_buffer::allocator::StandardCommandBufferAllocator;
-use vulkano::device::physical;
 use vulkano::image::{Image, view::ImageView};
-use vulkano::instance::{InstanceExtensions, InstanceOwned};
-use vulkano::memory::allocator::StandardMemoryAllocator;
 use vulkano::render_pass::{Framebuffer, FramebufferCreateInfo, RenderPass};
 use vulkano::swapchain::Surface;
 
 mod app;
+mod diagnostics_print;
 mod mesh;
-mod myglfw;
-mod rcx;
+mod render;
 mod shaders;
-mod summary;
 mod vulkan;
+mod windower;
 
 use crate::app::App;
-use crate::mesh::init_mesh;
-use crate::myglfw::init_glfw;
-use crate::rcx::init_rcx;
-use crate::summary::print_vulkan_project_summary;
-use crate::vulkan::{init_device, init_vkinstance};
+use crate::diagnostics_print::print_diagnostics;
+
+use crate::mesh::create_mesh;
+use crate::render::create_render_context;
+use crate::vulkan::{create_device, create_vulkan_instance};
+use crate::windower::create_window;
 
 fn main() {
     pollster::block_on(run());
@@ -30,23 +28,23 @@ fn main() {
 
 async fn run() {
     // GLFW is the window manager api. It stands for Good Luck Fellow Witches
-    let (mut glfw, window, events) = init_glfw();
+    let (mut glfw, window, events) = create_window();
     let windowing_extensions =
         Surface::required_extensions(&window).expect("Failed to get required extensions");
-    let vulkan = init_vkinstance(windowing_extensions);
+    let vulkan = create_vulkan_instance(windowing_extensions);
     let surface =
         Surface::from_window(vulkan.clone(), window.clone()).expect("failed to create surface");
-    let (device, queue) = init_device(vulkan.clone(), surface.clone());
-    print_vulkan_project_summary(&vulkan, &surface, &device, &queue);
+    let (device, queue) = create_device(vulkan.clone(), surface.clone());
+    print_diagnostics(&vulkan, &surface, &device, &queue);
 
-    let render_context = init_rcx(surface.clone(), device.clone());
+    let render_context = create_render_context(surface.clone(), device.clone());
 
     let command_buffer_allocator = Arc::new(StandardCommandBufferAllocator::new(
         device.clone(),
         Default::default(),
     ));
 
-    let mesh = init_mesh(device.clone());
+    let mesh = create_mesh(device.clone());
 
     let mut myapp = App {
         window,

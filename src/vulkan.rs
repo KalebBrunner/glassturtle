@@ -1,6 +1,5 @@
 use std::sync::Arc;
 
-use glfw::PWindow;
 use vulkano::{
     Version, VulkanLibrary,
     device::{
@@ -11,14 +10,13 @@ use vulkano::{
         Instance, InstanceCreateInfo, InstanceExtensions,
         debug::{DebugUtilsMessenger, DebugUtilsMessengerCallback, DebugUtilsMessengerCreateInfo},
     },
-    pipeline::graphics,
-    swapchain::{Surface, SurfaceInfo},
+    swapchain::Surface,
 };
 
 const USE_VALIDATION_LAYERS: bool = true;
 const VALIDATION_LAYERS: [&str; 1] = ["VK_LAYER_KHRONOS_validation"];
 
-pub fn init_vkinstance(windowing_extensions: InstanceExtensions) -> Arc<Instance> {
+pub fn create_vulkan_instance(windowing_extensions: InstanceExtensions) -> Arc<Instance> {
     let library = VulkanLibrary::new().expect("failed to load Vulkan library");
     println!("Vulkan ver: {:?}", library.api_version());
 
@@ -125,17 +123,17 @@ fn setup_debug_messenger(instance: Arc<Instance>) -> DebugUtilsMessenger {
     return debug_messenger;
 }
 
-pub fn init_device(vulkan: Arc<Instance>, surface: Arc<Surface>) -> (Arc<Device>, Arc<Queue>) {
-    let physical_device = init_physical_device(&vulkan);
+pub fn create_device(vulkan: Arc<Instance>, surface: Arc<Surface>) -> (Arc<Device>, Arc<Queue>) {
+    let physical_device = create_physical_device(&vulkan);
 
     let (logical_device, mut queues) =
-        init_logical_device(physical_device.clone(), surface.clone());
+        create_logical_device(physical_device.clone(), surface.clone());
     let queue = queues.next().unwrap();
 
     (logical_device, queue)
 }
 
-fn init_physical_device(vulkan: &Arc<Instance>) -> Arc<PhysicalDevice> {
+fn create_physical_device(vulkan: &Arc<Instance>) -> Arc<PhysicalDevice> {
     let device_id = 0;
     let physical_device = vulkan
         .enumerate_physical_devices()
@@ -153,7 +151,7 @@ fn init_physical_device(vulkan: &Arc<Instance>) -> Arc<PhysicalDevice> {
     physical_device
 }
 
-fn init_logical_device(
+fn create_logical_device(
     physical_device: Arc<PhysicalDevice>,
     surface: Arc<Surface>,
 ) -> (Arc<Device>, impl ExactSizeIterator<Item = Arc<Queue>>) {
