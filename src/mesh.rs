@@ -14,7 +14,7 @@ pub struct Mesh {
 
 pub fn create_mesh(device: Arc<Device>) -> Mesh {
     let memory_allocator = Arc::new(StandardMemoryAllocator::new_default(device.clone()));
-    let vertices = make_sine_ribbon();
+    let vertices = make_cube();
     let vertex_buffer = Buffer::from_iter(
         memory_allocator,
         BufferCreateInfo {
@@ -33,55 +33,60 @@ pub fn create_mesh(device: Arc<Device>) -> Mesh {
     Mesh { vertex_buffer }
 }
 
-fn make_sine_ribbon() -> Vec<MeshVertex> {
-    let mut vertices = Vec::new();
+fn make_cube() -> Vec<MeshVertex> {
+    let red = [1.0, 0.1, 0.1];
+    let green = [0.1, 1.0, 0.1];
+    let blue = [0.1, 0.3, 1.0];
+    let yellow = [1.0, 0.9, 0.1];
+    let cyan = [0.1, 1.0, 1.0];
+    let magenta = [1.0, 0.1, 1.0];
 
-    let samples = 80;
-    let thickness = 0.08f32;
+    vec![
+        // front z = 0.5
+        v([-0.5, -0.5, 0.5], red),
+        v([0.5, -0.5, 0.5], red),
+        v([0.5, 0.5, 0.5], red),
+        v([-0.5, -0.5, 0.5], red),
+        v([0.5, 0.5, 0.5], red),
+        v([-0.5, 0.5, 0.5], red),
+        // back z = -0.5
+        v([0.5, -0.5, -0.5], green),
+        v([-0.5, -0.5, -0.5], green),
+        v([-0.5, 0.5, -0.5], green),
+        v([0.5, -0.5, -0.5], green),
+        v([-0.5, 0.5, -0.5], green),
+        v([0.5, 0.5, -0.5], green),
+        // left x = -0.5
+        v([-0.5, -0.5, -0.5], blue),
+        v([-0.5, -0.5, 0.5], blue),
+        v([-0.5, 0.5, 0.5], blue),
+        v([-0.5, -0.5, -0.5], blue),
+        v([-0.5, 0.5, 0.5], blue),
+        v([-0.5, 0.5, -0.5], blue),
+        // right x = 0.5
+        v([0.5, -0.5, 0.5], yellow),
+        v([0.5, -0.5, -0.5], yellow),
+        v([0.5, 0.5, -0.5], yellow),
+        v([0.5, -0.5, 0.5], yellow),
+        v([0.5, 0.5, -0.5], yellow),
+        v([0.5, 0.5, 0.5], yellow),
+        // top y = 0.5
+        v([-0.5, 0.5, 0.5], cyan),
+        v([0.5, 0.5, 0.5], cyan),
+        v([0.5, 0.5, -0.5], cyan),
+        v([-0.5, 0.5, 0.5], cyan),
+        v([0.5, 0.5, -0.5], cyan),
+        v([-0.5, 0.5, -0.5], cyan),
+        // bottom y = -0.5
+        v([-0.5, -0.5, -0.5], magenta),
+        v([0.5, -0.5, -0.5], magenta),
+        v([0.5, -0.5, 0.5], magenta),
+        v([-0.5, -0.5, -0.5], magenta),
+        v([0.5, -0.5, 0.5], magenta),
+        v([-0.5, -0.5, 0.5], magenta),
+    ]
+}
 
-    for i in 0..(samples - 1) {
-        let t0 = i as f32 / (samples - 1) as f32;
-        let t1 = (i + 1) as f32 / (samples - 1) as f32;
-
-        // map t into x in [-0.9, 0.9]
-        let x0 = -0.9 + 1.8 * t0;
-        let x1 = -0.9 + 1.8 * t1;
-
-        // manually compute sine wave
-        let y0 = 0.35 * (x0 * 6.0).sin();
-        let y1 = 0.35 * (x1 * 6.0).sin();
-
-        // same color on top/bottom at each sample
-        // so gradient runs along the wave, not across its width
-        let c0 = [t0, 0.2, 1.0 - t0];
-        let c1 = [t1, 0.2, 1.0 - t1];
-
-        let top0 = MeshVertex {
-            position: [x0, y0 + thickness, 0.0],
-            color: c0,
-        };
-        let bottom0 = MeshVertex {
-            position: [x0, y0 - thickness, 0.0],
-            color: c0,
-        };
-        let top1 = MeshVertex {
-            position: [x1, y1 + thickness, 0.0],
-            color: c1,
-        };
-        let bottom1 = MeshVertex {
-            position: [x1, y1 - thickness, 0.0],
-            color: c1,
-        };
-
-        // quad -> 2 triangles
-        vertices.push(top0);
-        vertices.push(bottom0);
-        vertices.push(bottom1);
-
-        vertices.push(top0);
-        vertices.push(bottom1);
-        vertices.push(top1);
-    }
-
-    vertices
+fn v(position: [f32; 3], color: [f32; 3]) -> MeshVertex {
+    MeshVertex { position, color }
 }
