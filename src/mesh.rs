@@ -57,19 +57,19 @@ fn make_sine_ribbon() -> Vec<MeshVertex> {
         let c1 = [t1, 0.2, 1.0 - t1];
 
         let top0 = MeshVertex {
-            position: [x0, y0 + thickness],
+            position: [x0, y0 + thickness, 0.0],
             color: c0,
         };
         let bottom0 = MeshVertex {
-            position: [x0, y0 - thickness],
+            position: [x0, y0 - thickness, 0.0],
             color: c0,
         };
         let top1 = MeshVertex {
-            position: [x1, y1 + thickness],
+            position: [x1, y1 + thickness, 0.0],
             color: c1,
         };
         let bottom1 = MeshVertex {
-            position: [x1, y1 - thickness],
+            position: [x1, y1 - thickness, 0.0],
             color: c1,
         };
 
