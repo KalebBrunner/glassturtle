@@ -13,10 +13,38 @@ use vulkano::{
     swapchain::Surface,
 };
 
+use crate::{VulkanDeviceKB, VulkanKB};
+
 const USE_VALIDATION_LAYERS: bool = true;
 const VALIDATION_LAYERS: [&str; 1] = ["VK_LAYER_KHRONOS_validation"];
 
-pub fn create_vulkan_instance(windowing_extensions: InstanceExtensions) -> Arc<Instance> {
+impl VulkanKB {
+    pub fn new(windowing_extensions: InstanceExtensions) -> VulkanKB {
+        let instance = create_instance(windowing_extensions);
+        let debug_messenger = setup_debug_messenger(instance.clone());
+
+        Self {
+            instance,
+            _debug_messenger: debug_messenger,
+        }
+    }
+}
+
+impl VulkanDeviceKB {
+    pub fn new(vulkan: Arc<Instance>) -> VulkanDeviceKB {
+        let physical_device = create_physical_device(&vulkan);
+
+        let (logical_device, mut queues) = create_logical_device(physical_device.clone());
+        let queue = queues.next().unwrap();
+
+        Self {
+            device: logical_device,
+            queue,
+        }
+    }
+}
+
+fn create_instance(windowing_extensions: InstanceExtensions) -> Arc<Instance> {
     let library = VulkanLibrary::new().expect("failed to load Vulkan library");
     println!("Vulkan ver: {:?}", library.api_version());
 
@@ -33,7 +61,7 @@ pub fn create_vulkan_instance(windowing_extensions: InstanceExtensions) -> Arc<I
     };
 
     let vulkan = Instance::new(library, create_info).expect("failed to create Vulkan instance");
-    let _debug_messenger = setup_debug_messenger(vulkan.clone());
+
     return vulkan;
 }
 
@@ -123,16 +151,6 @@ fn setup_debug_messenger(instance: Arc<Instance>) -> DebugUtilsMessenger {
     return debug_messenger;
 }
 
-pub fn create_device(vulkan: Arc<Instance>, surface: Arc<Surface>) -> (Arc<Device>, Arc<Queue>) {
-    let physical_device = create_physical_device(&vulkan);
-
-    let (logical_device, mut queues) =
-        create_logical_device(physical_device.clone(), surface.clone());
-    let queue = queues.next().unwrap();
-
-    (logical_device, queue)
-}
-
 fn create_physical_device(vulkan: &Arc<Instance>) -> Arc<PhysicalDevice> {
     let device_id = 0;
     let physical_device = vulkan
@@ -153,7 +171,6 @@ fn create_physical_device(vulkan: &Arc<Instance>) -> Arc<PhysicalDevice> {
 
 fn create_logical_device(
     physical_device: Arc<PhysicalDevice>,
-    surface: Arc<Surface>,
 ) -> (Arc<Device>, impl ExactSizeIterator<Item = Arc<Queue>>) {
     let features = DeviceFeatures::empty();
     println!("Device features: {:?}", features);
@@ -168,12 +185,7 @@ fn create_logical_device(
         .queue_family_properties()
         .iter()
         .enumerate()
-        .position(|(index, queue_family)| {
-            queue_family.queue_flags.contains(QueueFlags::GRAPHICS)
-                && physical_device
-                    .surface_support(index as u32, &surface)
-                    .unwrap_or(false)
-        })
+        .position(|(index, queue_family)| queue_family.queue_flags.contains(QueueFlags::GRAPHICS))
         .expect("could not find a graphics queue family") as u32;
     // println!(
     //     "Device queues: {:?}",
