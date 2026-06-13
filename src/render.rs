@@ -252,11 +252,11 @@ pub fn create_swapchain(
     let present_mode = PresentMode::Fifo;
     let full_screen_exclusive = FullScreenExclusive::Default;
 
-    let composite_alpha = surface_capabilities
-        .supported_composite_alpha
-        .into_iter()
-        .find(|mode| matches!(mode, CompositeAlpha::Inherit))
-        .expect("This surface does not support transparent window composition");
+    // let composite_alpha = surface_capabilities
+    //     .supported_composite_alpha
+    //     .into_iter()
+    //     .find(|mode| matches!(mode, CompositeAlpha::Inherit))
+    //     .expect("This surface does not support transparent window composition");
 
     let swap_info = SwapchainCreateInfo {
         min_image_count,
@@ -265,7 +265,7 @@ pub fn create_swapchain(
         image_usage: ImageUsage::COLOR_ATTACHMENT,
         pre_transform,
         image_color_space: color_space,
-        composite_alpha,
+        // composite_alpha,
         present_mode,
         full_screen_exclusive,
         ..Default::default()
