@@ -1,40 +1,41 @@
+use glfw::PWindow;
 use std::sync::Arc;
 use vulkano::{
-    buffer::{Buffer, BufferCreateInfo, BufferUsage},
     command_buffer::{
         AutoCommandBufferBuilder, CommandBufferUsage, RenderPassBeginInfo, SubpassBeginInfo,
-        SubpassContents, SubpassEndInfo, allocator::StandardCommandBufferAllocator,
+        SubpassContents, SubpassEndInfo,
     },
-    descriptor_set::{DescriptorSet, WriteDescriptorSet},
-    device::{Device, Queue},
-    memory::allocator::{AllocationCreateInfo, MemoryTypeFilter, StandardMemoryAllocator},
+    device::Device,
     pipeline::{Pipeline, graphics::viewport::Viewport},
     swapchain::{self, SwapchainPresentInfo},
     sync::{self, GpuFuture},
 };
 
-use crate::{camera::Camera, render::RenderContext, shaders::mesh_vertex::CameraUniform};
-use crate::{mesh::Mesh, render::create_framebuffers};
+use crate::{
+    camera::Camera,
+    mesh::Mesh,
+    render::{RenderContextKB, create_framebuffers},
+    vulkan::WindowContextKB,
+};
 
 pub struct App {
-    pub window: Arc<glfw::PWindow>,
-    pub device: Arc<Device>,
-    pub queue: Arc<Queue>,
-    pub command_buffer_allocator: Arc<StandardCommandBufferAllocator>,
+    pub window: Arc<PWindow>,
+    pub window_context: WindowContextKB,
+    pub render_context: RenderContextKB,
     pub mesh: Mesh,
-    pub render_context: RenderContext,
     pub camera: Camera,
 }
 
 impl App {
     pub fn draw_frame(&mut self) {
         let rcx = &mut self.render_context;
+        let wcx = &mut self.window_context;
 
         rcx.previous_frame_end.as_mut().unwrap().cleanup_finished();
 
         if rcx.recreate_swapchain {
             let image_extent = self.window.get_framebuffer_size();
-            recreate_swapchain(rcx, self.device.clone(), image_extent);
+            recreate_swapchain(rcx, wcx.device.clone(), image_extent);
         }
 
         let (image_index, suboptimal, acquire_future) =
@@ -53,11 +54,15 @@ impl App {
             rcx.recreate_swapchain = true;
         }
 
-        let descriptor_set = rcx.create_camera_descriptor_set(self.device.clone(), &self.camera);
+        let descriptor_set = rcx.create_camera_descriptor_set(
+            wcx.descriptor_set_allocator.clone(),
+            wcx.device.clone(),
+            &self.camera,
+        );
 
         let mut builder = AutoCommandBufferBuilder::primary(
-            self.command_buffer_allocator.clone(),
-            self.queue.queue_family_index(),
+            wcx.command_buffer_allocator.clone(),
+            wcx.queue.queue_family_index(),
             CommandBufferUsage::OneTimeSubmit,
         )
         .unwrap();
@@ -101,10 +106,10 @@ impl App {
             .take()
             .unwrap()
             .join(acquire_future)
-            .then_execute(self.queue.clone(), command_buffer)
+            .then_execute(wcx.queue.clone(), command_buffer)
             .unwrap()
             .then_swapchain_present(
-                self.queue.clone(),
+                wcx.queue.clone(),
                 SwapchainPresentInfo::swapchain_image_index(rcx.swapchain.clone(), image_index),
             )
             .then_signal_fence_and_flush();
@@ -114,17 +119,21 @@ impl App {
             Ok(future) => future.boxed(),
             Err(vulkano::VulkanError::OutOfDate) => {
                 rcx.recreate_swapchain = true;
-                sync::now(self.device.clone()).boxed()
+                sync::now(wcx.device.clone()).boxed()
             }
             Err(e) => {
                 eprintln!("failed to flush future: {e}");
-                sync::now(self.device.clone()).boxed()
+                sync::now(wcx.device.clone()).boxed()
             }
         });
     }
 }
 
-pub fn recreate_swapchain(rcx: &mut RenderContext, device: Arc<Device>, image_extent: (i32, i32)) {
+pub fn recreate_swapchain(
+    rcx: &mut RenderContextKB,
+    device: Arc<Device>,
+    image_extent: (i32, i32),
+) {
     if image_extent.0 == 0 || image_extent.1 == 0 {
         println!("RCX: Window is minimized");
         return;

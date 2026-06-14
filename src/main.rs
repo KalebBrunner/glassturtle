@@ -1,13 +1,5 @@
-#![allow(unused_imports)]
-#![allow(unused_variables)]
-use std::sync::Arc;
-use vulkano::command_buffer::allocator::StandardCommandBufferAllocator;
-use vulkano::device::{Device, Queue};
-use vulkano::image::{Image, view::ImageView};
-use vulkano::instance::debug::DebugUtilsMessenger;
-use vulkano::instance::{Instance, InstanceExtensions};
-use vulkano::render_pass::{Framebuffer, FramebufferCreateInfo, RenderPass};
-use vulkano::swapchain::Surface;
+// #![allow(unused_imports)]
+// #![allow(unused_variables)]
 
 mod app;
 mod camera;
@@ -22,79 +14,59 @@ mod windower;
 use crate::app::App;
 use crate::camera::Camera;
 use crate::diagnostics_print::print_diagnostics;
-
 use crate::mesh::create_mesh;
-use crate::render::create_render_context;
+use crate::render::RenderContextKB;
+use crate::vulkan::{WindowContextKB, create_instance, setup_debug_messenger};
 use crate::windower::create_window;
 
-pub struct RendererKB {
-    vulkan: VulkanKB,
-    device: VulkanDeviceKB,
-}
-
-impl RendererKB {
-    pub fn new(window_extensions: InstanceExtensions) -> Self {
-        let vulkan = VulkanKB::new(window_extensions);
-        let device = VulkanDeviceKB::new(vulkan.instance.clone());
-        Self { vulkan, device }
-    }
-
-    pub fn print(&self, surface: &Arc<Surface>) {
-        print_diagnostics(
-            &self.vulkan.instance,
-            &surface,
-            &self.device.device,
-            &self.device.queue,
-        );
-    }
-}
-
-pub struct VulkanKB {
-    pub instance: Arc<Instance>,
-    pub _debug_messenger: DebugUtilsMessenger,
-}
-
-pub struct VulkanDeviceKB {
-    pub device: Arc<Device>,
-    pub queue: Arc<Queue>,
-}
+use vulkano::swapchain::Surface;
 
 fn main() {
     pollster::block_on(run());
 }
 
 async fn run() {
-    // GLFW is the window manager api. It stands for Good Luck Fellow Witches
+    // GLFW is the window manager api. It stands for Good Luck Fellow Witches.
     let (mut glfw, window, events) = create_window();
 
+    // Functionallity requested by the window manager and thus also the OS.
+    // Most notably is the VkSurfaceKHR extension.
     let window_extensions =
         Surface::required_extensions(&window).expect("Failed to get required extensions");
 
-    let my_renderer = RendererKB::new(window_extensions);
+    // Vulkan itself
+    let vulkan = create_instance(window_extensions);
+    let _debug_messenger = setup_debug_messenger(vulkan.clone());
 
-    let surface = Surface::from_window(my_renderer.vulkan.instance.clone(), window.clone())
-        .expect("failed to create surface");
+    // Native platform surface or window objects are abstracted by surface objects,
+    // which are represented by VkSurfaceKHR handles.
+    let surface =
+        Surface::from_window(vulkan.clone(), window.clone()).expect("failed to create surface");
 
-    my_renderer.print(&surface);
+    let window_context = WindowContextKB::new(vulkan.clone(), surface.clone());
 
-    let render_context = create_render_context(surface.clone(), my_renderer.device.device.clone());
+    print_diagnostics(
+        &vulkan,
+        &surface,
+        &window_context.device,
+        &window_context.queue,
+    );
 
-    let command_buffer_allocator = Arc::new(StandardCommandBufferAllocator::new(
-        my_renderer.device.device.clone(),
-        Default::default(),
-    ));
+    // An encapsulation for the rendering engine
+    let render_context = RenderContextKB::new(
+        window_context.surface.clone(),
+        window_context.device.clone(),
+    );
 
-    let mesh = create_mesh(my_renderer.device.device.clone());
+    let mesh = create_mesh(window_context.device.clone());
 
     let camera = Camera::new();
 
     let mut myapp = App {
         window,
-        device: my_renderer.device.device,
-        queue: my_renderer.device.queue,
-        command_buffer_allocator,
+        window_context,
+        render_context,
         mesh,
-        render_context: render_context,
         camera,
     };
 

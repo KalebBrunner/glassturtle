@@ -32,13 +32,11 @@ use vulkano::{
         layout::PipelineDescriptorSetLayoutCreateInfo,
     },
     render_pass::{Framebuffer, RenderPass, Subpass},
-    swapchain::{
-        CompositeAlpha, FullScreenExclusive, PresentMode, Surface, Swapchain, SwapchainCreateInfo,
-    },
+    swapchain::{FullScreenExclusive, PresentMode, Surface, Swapchain, SwapchainCreateInfo},
     sync::{self, GpuFuture},
 };
 
-pub struct RenderContext {
+pub struct RenderContextKB {
     pub swapchain: Arc<Swapchain>,
     pub render_pass: Arc<RenderPass>,
     pub framebuffers: Vec<Arc<Framebuffer>>,
@@ -46,12 +44,45 @@ pub struct RenderContext {
     pub viewport: Viewport,
     pub recreate_swapchain: bool,
     pub previous_frame_end: Option<Box<dyn GpuFuture>>,
-    pub descriptor_set_allocator: Arc<StandardDescriptorSetAllocator>,
 }
 
-impl RenderContext {
+impl RenderContextKB {
+    pub fn new(surface: Arc<Surface>, device: Arc<Device>) -> Self {
+        let (swapchain, swapchain_images) = create_swapchain(&surface, device.clone());
+
+        let image_extent = swapchain.image_extent();
+
+        let viewport = Viewport {
+            offset: [0.0, 0.0],
+            extent: [image_extent[0] as f32, image_extent[1] as f32],
+            depth_range: 0.0..=1.0,
+        };
+
+        let render_pass = create_renderpass(device.clone(), swapchain.image_format());
+
+        let framebuffers =
+            create_framebuffers(device.clone(), &swapchain_images, render_pass.clone());
+
+        let pipeline = create_pipeline(device.clone(), render_pass.clone());
+
+        let previous_frame_end = Some(sync::now(device.clone()).boxed());
+
+        let recreate_swapchain = false;
+
+        Self {
+            swapchain,
+            viewport,
+            render_pass,
+            pipeline,
+            framebuffers,
+            previous_frame_end,
+            recreate_swapchain,
+        }
+    }
+
     pub fn create_camera_descriptor_set(
         &self,
+        descriptor_set_allocator: Arc<StandardDescriptorSetAllocator>,
         device: Arc<Device>,
         camera: &Camera,
     ) -> Arc<DescriptorSet> {
@@ -81,7 +112,7 @@ impl RenderContext {
         let layout = self.pipeline.layout().set_layouts().get(0).unwrap().clone();
 
         let descriptor_set = DescriptorSet::new(
-            self.descriptor_set_allocator.clone(),
+            descriptor_set_allocator.clone(),
             layout,
             [WriteDescriptorSet::buffer(0, uniform_buffer)],
             [],
@@ -89,44 +120,6 @@ impl RenderContext {
         .unwrap();
 
         return descriptor_set;
-    }
-}
-
-pub fn create_render_context(surface: Arc<Surface>, device: Arc<Device>) -> RenderContext {
-    let (swapchain, swapchain_images) = create_swapchain(&surface, device.clone());
-
-    let image_extent = swapchain.image_extent();
-
-    let viewport = Viewport {
-        offset: [0.0, 0.0],
-        extent: [image_extent[0] as f32, image_extent[1] as f32],
-        depth_range: 0.0..=1.0,
-    };
-
-    let render_pass = create_renderpass(device.clone(), swapchain.image_format());
-
-    let framebuffers = create_framebuffers(device.clone(), &swapchain_images, render_pass.clone());
-
-    let pipeline = create_pipeline(device.clone(), render_pass.clone());
-
-    let previous_frame_end = Some(sync::now(device.clone()).boxed());
-
-    let recreate_swapchain = false;
-
-    let descriptor_set_allocator = Arc::new(StandardDescriptorSetAllocator::new(
-        device.clone(),
-        Default::default(),
-    ));
-
-    RenderContext {
-        swapchain,
-        viewport,
-        render_pass,
-        pipeline,
-        framebuffers,
-        previous_frame_end,
-        recreate_swapchain,
-        descriptor_set_allocator,
     }
 }
 
@@ -216,7 +209,7 @@ fn create_renderpass(device: Arc<Device>, format: Format) -> Arc<RenderPass> {
     .unwrap()
 }
 
-pub fn create_swapchain(
+fn create_swapchain(
     surface: &Arc<Surface>,
     logical_device: Arc<Device>,
 ) -> (Arc<Swapchain>, Vec<Arc<Image>>) {

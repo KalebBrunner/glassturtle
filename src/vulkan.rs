@@ -1,7 +1,8 @@
 use std::sync::Arc;
-
 use vulkano::{
     Version, VulkanLibrary,
+    command_buffer::allocator::StandardCommandBufferAllocator,
+    descriptor_set::allocator::StandardDescriptorSetAllocator,
     device::{
         Device, DeviceCreateInfo, DeviceExtensions, DeviceFeatures, Queue, QueueCreateInfo,
         QueueFlags, physical::PhysicalDevice,
@@ -13,38 +14,48 @@ use vulkano::{
     swapchain::Surface,
 };
 
-use crate::{VulkanDeviceKB, VulkanKB};
-
 const USE_VALIDATION_LAYERS: bool = true;
 const VALIDATION_LAYERS: [&str; 1] = ["VK_LAYER_KHRONOS_validation"];
 
-impl VulkanKB {
-    pub fn new(windowing_extensions: InstanceExtensions) -> VulkanKB {
-        let instance = create_instance(windowing_extensions);
-        let debug_messenger = setup_debug_messenger(instance.clone());
-
-        Self {
-            instance,
-            _debug_messenger: debug_messenger,
-        }
-    }
+pub struct WindowContextKB {
+    pub surface: Arc<Surface>,
+    pub device: Arc<Device>,
+    pub queue: Arc<Queue>,
+    // pub memory_allocator: Arc<GenericMemoryAllocator<FreeListAllocator>>,
+    pub command_buffer_allocator: Arc<StandardCommandBufferAllocator>,
+    pub descriptor_set_allocator: Arc<StandardDescriptorSetAllocator>,
 }
 
-impl VulkanDeviceKB {
-    pub fn new(vulkan: Arc<Instance>) -> VulkanDeviceKB {
-        let physical_device = create_physical_device(&vulkan);
+impl WindowContextKB {
+    pub fn new(vulkan: Arc<Instance>, surface: Arc<Surface>) -> Self {
+        let (device, mut queues) = create_logical_device(create_physical_device(&vulkan));
 
-        let (logical_device, mut queues) = create_logical_device(physical_device.clone());
         let queue = queues.next().unwrap();
 
+        // let memory_allocator = Arc::new(StandardMemoryAllocator::new_default(device.clone()));
+
+        let command_buffer_allocator = Arc::new(StandardCommandBufferAllocator::new(
+            device.clone(),
+            Default::default(),
+        ));
+
+        let descriptor_set_allocator = Arc::new(StandardDescriptorSetAllocator::new(
+            device.clone(),
+            Default::default(),
+        ));
+
         Self {
-            device: logical_device,
+            surface,
+            device,
             queue,
+            // memory_allocator,
+            command_buffer_allocator,
+            descriptor_set_allocator,
         }
     }
 }
 
-fn create_instance(windowing_extensions: InstanceExtensions) -> Arc<Instance> {
+pub fn create_instance(windowing_extensions: InstanceExtensions) -> Arc<Instance> {
     let library = VulkanLibrary::new().expect("failed to load Vulkan library");
     println!("Vulkan ver: {:?}", library.api_version());
 
@@ -63,6 +74,22 @@ fn create_instance(windowing_extensions: InstanceExtensions) -> Arc<Instance> {
     let vulkan = Instance::new(library, create_info).expect("failed to create Vulkan instance");
 
     return vulkan;
+}
+
+pub fn setup_debug_messenger(instance: Arc<Instance>) -> DebugUtilsMessenger {
+    if !USE_VALIDATION_LAYERS {
+        panic!("Debug set without validation layers");
+    }
+    let debug_messenger = DebugUtilsMessenger::new(
+        instance,
+        DebugUtilsMessengerCreateInfo::user_callback(unsafe {
+            DebugUtilsMessengerCallback::new(|severity, ty, data| {
+                eprintln!("[Vulkan][{:?}][{:?}] {}", severity, ty, data.message);
+            })
+        }),
+    )
+    .expect("failed to create Vulkan debug messenger");
+    return debug_messenger;
 }
 
 fn collect_extensions(
@@ -135,22 +162,6 @@ fn collect_layers(library: &VulkanLibrary) -> Vec<String> {
     }
 }
 
-fn setup_debug_messenger(instance: Arc<Instance>) -> DebugUtilsMessenger {
-    if !USE_VALIDATION_LAYERS {
-        panic!("Debug set without validation layers");
-    }
-    let debug_messenger = DebugUtilsMessenger::new(
-        instance,
-        DebugUtilsMessengerCreateInfo::user_callback(unsafe {
-            DebugUtilsMessengerCallback::new(|severity, ty, data| {
-                eprintln!("[Vulkan][{:?}][{:?}] {}", severity, ty, data.message);
-            })
-        }),
-    )
-    .expect("failed to create Vulkan debug messenger");
-    return debug_messenger;
-}
-
 fn create_physical_device(vulkan: &Arc<Instance>) -> Arc<PhysicalDevice> {
     let device_id = 0;
     let physical_device = vulkan
@@ -185,7 +196,7 @@ fn create_logical_device(
         .queue_family_properties()
         .iter()
         .enumerate()
-        .position(|(index, queue_family)| queue_family.queue_flags.contains(QueueFlags::GRAPHICS))
+        .position(|(_index, queue_family)| queue_family.queue_flags.contains(QueueFlags::GRAPHICS))
         .expect("could not find a graphics queue family") as u32;
     // println!(
     //     "Device queues: {:?}",

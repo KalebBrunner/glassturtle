@@ -1,9 +1,6 @@
-use glam::Vec3;
 use glfw::{Action, Key, WindowEvent};
 
 use crate::camera::Camera;
-
-const CAMERA_MOVE_SPEED: f32 = 0.1;
 
 const CAMERA_ORBIT_SPEED: f32 = 0.05;
 
