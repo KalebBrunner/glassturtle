@@ -73,9 +73,7 @@ fn main() {
     let mut app = App::new(&window);
     app.init_render_context(window.clone());
 
-    let mut close_requested = false;
-
-    while !window.should_close() && !close_requested {
+    while !window.should_close() {
         glfw.wait_events_timeout(1.0 / 60.0);
 
         for (_, events) in glfw::flush_messages(&events) {
@@ -86,7 +84,7 @@ fn main() {
                     }
                 }
                 glfw::WindowEvent::Close => {
-                    close_requested = true;
+                    return;
                 }
                 _ => {}
             }
