@@ -5,15 +5,19 @@ use vulkano::{
     Validated, Version,
     VulkanError::{self},
     VulkanLibrary,
-    buffer::{Buffer, BufferContents, BufferCreateInfo, BufferUsage},
+    buffer::{Buffer, BufferContents, BufferCreateInfo, BufferUsage, Subbuffer},
+    command_buffer::{
+        AutoCommandBufferBuilder, CommandBufferUsage, RenderingAttachmentInfo, RenderingInfo,
+        allocator::StandardCommandBufferAllocator,
+    },
     device::{
         Device, DeviceCreateInfo, DeviceExtensions, DeviceFeatures, Queue, QueueCreateInfo,
         QueueFlags, physical::PhysicalDeviceType,
     },
     format::Format,
-    image::ImageUsage,
+    image::{Image, ImageUsage, view::ImageView},
     instance::{Instance, InstanceCreateInfo},
-    memory::allocator::{AllocationCreateInfo, DeviceLayout, MemoryTypeFilter},
+    memory::allocator::{AllocationCreateInfo, MemoryTypeFilter, StandardMemoryAllocator},
     pipeline::{
         DynamicState, GraphicsPipeline, PipelineLayout, PipelineShaderStageCreateInfo,
         graphics::{
@@ -22,47 +26,39 @@ use vulkano::{
             input_assembly::InputAssemblyState,
             multisample::MultisampleState,
             rasterization::RasterizationState,
+            subpass::PipelineRenderingCreateInfo,
             vertex_input::{Vertex, VertexDefinition},
             viewport::{Viewport, ViewportState},
         },
         layout::PipelineDescriptorSetLayoutCreateInfo,
     },
-    render_pass::Subpass,
-    swapchain::{Surface, Swapchain, SwapchainCreateInfo},
-};
-use vulkano_taskgraph::{
-    ClearValues, Id, QueueFamilyType, Task, TaskContext,
-    command_buffer::RecordingCommandBuffer,
-    graph::{AttachmentInfo, CompileInfo, ExecutableTaskGraph, ExecuteError, TaskGraph},
-    resource::{AccessTypes, Flight, HostAccessType, ImageLayoutType, Resources},
-    resource_map,
+    render_pass::{AttachmentLoadOp, AttachmentStoreOp},
+    swapchain::{
+        Surface, Swapchain, SwapchainCreateInfo, SwapchainPresentInfo, acquire_next_image,
+    },
+    sync::{self, GpuFuture},
 };
 
-const MAX_FRAMES_IN_FLIGHT: u32 = 2;
-const MIN_SWAPCHAIN_IMAGES: u32 = MAX_FRAMES_IN_FLIGHT + 1;
 struct App {
     instance: Arc<Instance>,
     device: Arc<Device>,
     queue: Arc<Queue>,
-    resources: Arc<Resources>,
-    flight_id: Id<Flight>,
+    command_buffer_allocator: Arc<StandardCommandBufferAllocator>,
+    vertex_buffer: Subbuffer<[MyVertex]>,
     rcx: Option<RenderContext>,
 }
 
 struct RenderContext {
     window: Arc<PWindow>,
-    swapchain_id: Id<Swapchain>,
+    swapchain: Arc<Swapchain>,
+    attachment_image_views: Vec<Arc<ImageView>>,
+    pipeline: Arc<GraphicsPipeline>,
     viewport: Viewport,
     recreate_swapchain: bool,
-    task_graph: ExecutableTaskGraph<Self>,
-    virtual_swapchain_id: Id<Swapchain>,
+    previous_frame_end: Option<Box<dyn GpuFuture>>,
 }
 
 fn main() {
-    pollster::block_on(run());
-}
-
-async fn run() {
     let mut glfw = glfw::init(glfw::log_errors!()).unwrap();
     glfw.window_hint(glfw::WindowHint::ClientApi(glfw::ClientApiHint::NoApi));
     let (mut pwindow, events) = glfw
@@ -75,12 +71,12 @@ async fn run() {
     let window = Arc::new(pwindow);
 
     let mut app = App::new(&window);
-    app.resumed(app.instance.clone(), window.clone());
+    app.init_render_context(window.clone());
 
     let mut close_requested = false;
 
     while !window.should_close() && !close_requested {
-        glfw.wait_events();
+        glfw.wait_events_timeout(1.0 / 60.0);
 
         for (_, events) in glfw::flush_messages(&events) {
             match events {
@@ -102,8 +98,8 @@ async fn run() {
 
 impl App {
     fn new(window: &Arc<PWindow>) -> Self {
-        let window_extensions =
-            Surface::required_extensions(&window).expect("Failed to get required extensions");
+        let window_extensions = Surface::required_extensions(window.as_ref())
+            .expect("Failed to get required extensions");
 
         let library = VulkanLibrary::new()
             .unwrap_or_else(|err| panic!("Couldn't load Vulkan library: {:?}", err));
@@ -120,7 +116,7 @@ impl App {
         let instance = Instance::new(library, instance_create_info)
             .unwrap_or_else(|err| panic!("Couldn't create instance: {:?}", err));
 
-        let device_extensions = DeviceExtensions {
+        let mut device_extensions = DeviceExtensions {
             khr_swapchain: true,
             ..DeviceExtensions::empty()
         };
@@ -128,6 +124,9 @@ impl App {
         let (physical_device, queue_family_index) = instance
             .enumerate_physical_devices()
             .unwrap()
+            .filter(|p| {
+                p.api_version() >= Version::V1_3 || p.supported_extensions().khr_dynamic_rendering
+            })
             .filter(|p| p.supported_extensions().contains(&device_extensions))
             .filter_map(|p| {
                 p.queue_family_properties()
@@ -135,7 +134,7 @@ impl App {
                     .enumerate()
                     .position(|(i, q)| {
                         q.queue_flags.intersects(QueueFlags::GRAPHICS)
-                            && p.presentation_support(i as u32, &window).unwrap()
+                            && p.presentation_support(i as u32, window.as_ref()).unwrap()
                     })
                     .map(|i| (p, i as u32))
             })
@@ -154,34 +153,9 @@ impl App {
             physical_device.properties().device_type,
         );
 
-        // let physical_device = instance
-        //     .enumerate_physical_devices()
-        //     .unwrap()
-        //     .nth(0)
-        //     .unwrap();
-
-        // println!(
-        //     "Using device: {} (type: {:?})",
-        //     physical_device.properties().device_name,
-        //     physical_device.properties().device_type
-        // );
-
-        // let queue_family_index = physical_device
-        //     .queue_family_properties()
-        //     .iter()
-        //     .enumerate()
-        //     .find_map(|(index, properties)| {
-        //         properties
-        //             .queue_flags
-        //             .contains(QueueFlags::GRAPHICS)
-        //             .then_some(index as u32)
-        //     })
-        //     .expect("could not find a graphics family");
-
-        // let device_extensions = DeviceExtensions {
-        //     khr_swapchain: true,
-        //     ..DeviceExtensions::default()
-        // };
+        if physical_device.api_version() < Version::V1_3 {
+            device_extensions.khr_dynamic_rendering = true;
+        }
 
         let queue_create_info = QueueCreateInfo {
             queue_family_index,
@@ -193,7 +167,10 @@ impl App {
             DeviceCreateInfo {
                 queue_create_infos: vec![queue_create_info],
                 enabled_extensions: device_extensions,
-                enabled_features: DeviceFeatures::empty(),
+                enabled_features: DeviceFeatures {
+                    dynamic_rendering: true,
+                    ..DeviceFeatures::empty()
+                },
                 ..Default::default()
             },
         ) {
@@ -203,30 +180,89 @@ impl App {
 
         let queue = queues.next().unwrap();
 
-        let resources = Resources::new(&device, &Default::default());
+        let memory_allocator = Arc::new(StandardMemoryAllocator::new_default(device.clone()));
 
-        let flight_id = resources.create_flight(MAX_FRAMES_IN_FLIGHT).unwrap();
+        let command_buffer_allocator = Arc::new(StandardCommandBufferAllocator::new(
+            device.clone(),
+            Default::default(),
+        ));
 
-        let rcx = None;
+        // We now create a buffer that will store the shape of our triangle.
+        let vertices = [
+            MyVertex {
+                position: [-0.5, -0.25],
+            },
+            MyVertex {
+                position: [0.0, 0.5],
+            },
+            MyVertex {
+                position: [0.25, -0.1],
+            },
+        ];
+        let vertex_buffer = Buffer::from_iter(
+            memory_allocator,
+            BufferCreateInfo {
+                usage: BufferUsage::VERTEX_BUFFER,
+                ..Default::default()
+            },
+            AllocationCreateInfo {
+                memory_type_filter: MemoryTypeFilter::PREFER_DEVICE
+                    | MemoryTypeFilter::HOST_SEQUENTIAL_WRITE,
+                ..Default::default()
+            },
+            vertices,
+        )
+        .unwrap();
 
         App {
             instance,
             device,
             queue,
-            resources,
-            flight_id,
-            rcx,
+            command_buffer_allocator,
+            vertex_buffer,
+            rcx: None,
         }
     }
 
-    fn resumed(&mut self, vulkan: Arc<Instance>, window: Arc<PWindow>) {
-        let surface = Surface::from_window(vulkan, window.clone()).unwrap();
+    fn init_render_context(&mut self, window: Arc<PWindow>) {
+        let surface = Surface::from_window(self.instance.clone(), window.clone()).unwrap();
         let (width, height) = window.get_framebuffer_size();
         let image_extent = [width as u32, height as u32];
         let view_extent = [width as f32, height as f32];
 
-        let (swapchain_id, swapchain_format) =
-            get_swapchain_id(&self, surface.clone(), image_extent);
+        let surface_capabilities = self
+            .device
+            .physical_device()
+            .surface_capabilities(&surface, Default::default())
+            .unwrap();
+
+        let (image_format, _) = self
+            .device
+            .physical_device()
+            .surface_formats(&surface, Default::default())
+            .unwrap()[0];
+
+        let desired_image_count = surface_capabilities.min_image_count.max(2);
+        let min_image_count = surface_capabilities
+            .max_image_count
+            .map_or(desired_image_count, |maximum| {
+                desired_image_count.min(maximum)
+            });
+        let swapchain_create_info = SwapchainCreateInfo {
+            image_format,
+            min_image_count,
+            image_extent: image_extent,
+            image_usage: ImageUsage::COLOR_ATTACHMENT,
+            composite_alpha: surface_capabilities
+                .supported_composite_alpha
+                .into_iter()
+                .next()
+                .unwrap(),
+            ..Default::default()
+        };
+
+        let (swapchain, images) =
+            Swapchain::new(self.device.clone(), surface, swapchain_create_info).unwrap();
 
         let viewport = Viewport {
             offset: [0.0, 0.0],
@@ -234,67 +270,19 @@ impl App {
             depth_range: 0.0..=1.0,
         };
 
-        let mut task_graph: TaskGraph<RenderContext> = TaskGraph::new(&self.resources, 1, 1);
-        let virtual_swapchain_id = task_graph.add_swapchain(&SwapchainCreateInfo {
-            image_format: swapchain_format,
-            ..Default::default()
-        });
-
-        let virtual_framebuffer_id = task_graph.add_framebuffer();
-
-        let triangle_node_id = task_graph
-            .create_task_node(
-                "Triangle",
-                QueueFamilyType::Graphics,
-                TriangleTask::new(self, virtual_swapchain_id),
-            )
-            .framebuffer(virtual_framebuffer_id)
-            .color_attachment(
-                virtual_swapchain_id.current_image_id(),
-                AccessTypes::COLOR_ATTACHMENT_WRITE,
-                ImageLayoutType::Optimal,
-                &AttachmentInfo {
-                    clear: true,
-                    ..Default::default()
-                },
-            )
-            .build();
-
-        let mut task_graph = unsafe {
-            task_graph.compile(&CompileInfo {
-                // We need to provide all queues that we want to use for executing the graph. The
-                // queue family types that were specified in the task nodes must be compatible with
-                // these queues.
-                //
-                // In this example, we only have a single graphics queue.
-                queues: &[&self.queue],
-                // We use the same queue for presentation. You must specify a present queue if your
-                // task graph uses any swapchains.
-                present_queue: Some(&self.queue),
-                // The flight that we use to track each execution of this task graph.
-                flight_id: self.flight_id,
-                ..Default::default()
-            })
-        }
-        .unwrap();
-
-        let triangle_node = task_graph.task_node_mut(triangle_node_id).unwrap();
-        let subpass = triangle_node.subpass().unwrap().clone();
-        triangle_node
-            .task_mut()
-            .downcast_mut::<TriangleTask>()
-            .unwrap()
-            .create_pipeline(&self, &subpass);
-
+        let attachment_image_views = window_size_dependent_setup(&images);
+        let pipeline = self.create_pipeline(image_format);
         let recreate_swapchain = false;
+        let previous_frame_end = Some(sync::now(self.device.clone()).boxed());
 
         self.rcx = Some(RenderContext {
             window,
-            swapchain_id,
+            swapchain,
+            attachment_image_views,
+            pipeline,
             viewport,
             recreate_swapchain,
-            task_graph,
-            virtual_swapchain_id,
+            previous_frame_end,
         });
     }
 
@@ -311,176 +299,140 @@ impl App {
             return;
         }
 
-        if rcx.recreate_swapchain {
-            let flight = self.resources.flight(self.flight_id).unwrap();
-            flight.wait(None).unwrap();
+        rcx.previous_frame_end.as_mut().unwrap().cleanup_finished();
 
-            rcx.swapchain_id = self
-                .resources
-                .recreate_swapchain(rcx.swapchain_id, |create_info: SwapchainCreateInfo| {
-                    SwapchainCreateInfo {
-                        image_extent,
-                        ..create_info
-                    }
+        if rcx.recreate_swapchain {
+            let (new_swapchain, new_images) = rcx
+                .swapchain
+                .recreate(SwapchainCreateInfo {
+                    image_extent,
+                    ..rcx.swapchain.create_info()
                 })
                 .expect("failed to recreate swapchain");
 
+            let format_changed = new_swapchain.image_format() != rcx.swapchain.image_format();
+
+            rcx.swapchain = new_swapchain;
+
+            rcx.attachment_image_views = window_size_dependent_setup(&new_images);
+
+            if format_changed {
+                rcx.pipeline = self.create_pipeline(rcx.swapchain.image_format());
+            }
             rcx.viewport.extent = view_extent;
+
             rcx.recreate_swapchain = false;
         }
 
-        let flight = self.resources.flight(self.flight_id);
-        flight.unwrap().wait(None).unwrap();
+        let (image_index, suboptimal, acquire_future) =
+            match acquire_next_image(rcx.swapchain.clone(), None).map_err(Validated::unwrap) {
+                Ok(r) => r,
+                Err(VulkanError::OutOfDate) => {
+                    rcx.recreate_swapchain = true;
+                    self.rcx = Some(rcx);
+                    return;
+                }
+                Err(e) => panic!("failed to acquire next image: {e}"),
+            };
 
-        let resource_map =
-            resource_map!(&rcx.task_graph, rcx.virtual_swapchain_id => rcx.swapchain_id).unwrap();
-
-        // Finally, it is time to execute the graph.
-        match unsafe { rcx.task_graph.execute(resource_map, &rcx, || {}) } {
-            Ok(()) => {}
-            // Since the task graph also handles presenting to the swapchain, it may return
-            // a swapchain error. When the swapchain is "out of date", we set a flag to
-            // recreate it during the next frame.
-            Err(ExecuteError::Swapchain {
-                error: Validated::Error(VulkanError::OutOfDate),
-                ..
-            }) => {
-                rcx.recreate_swapchain = true;
-            }
-            Err(e) => {
-                panic!("failed to execute next frame: {e:?}");
-            }
+        if suboptimal {
+            rcx.recreate_swapchain = true;
         }
 
-        self.rcx = Some(rcx);
-    }
-}
-
-fn get_swapchain_id(
-    app: &App,
-    surface: Arc<Surface>,
-    image_extent: [u32; 2],
-) -> (Id<Swapchain>, Format) {
-    let surface_capabilities = app
-        .device
-        .physical_device()
-        .surface_capabilities(&surface, Default::default())
+        let mut builder = AutoCommandBufferBuilder::primary(
+            self.command_buffer_allocator.clone(),
+            self.queue.queue_family_index(),
+            CommandBufferUsage::OneTimeSubmit,
+        )
         .unwrap();
 
-    let (swapchain_format, _) = app
-        .device
-        .physical_device()
-        .surface_formats(&surface, Default::default())
-        .unwrap()[0];
-
-    let swapchain_create_info = SwapchainCreateInfo {
-        min_image_count: surface_capabilities
-            .min_image_count
-            .max(MIN_SWAPCHAIN_IMAGES),
-        image_format: swapchain_format,
-        image_extent: image_extent,
-        image_usage: ImageUsage::COLOR_ATTACHMENT,
-        composite_alpha: surface_capabilities
-            .supported_composite_alpha
-            .into_iter()
-            .next()
-            .unwrap(),
-        ..Default::default()
-    };
-
-    let swapchain_id = app
-        .resources
-        .create_swapchain(app.flight_id, surface, swapchain_create_info)
-        .unwrap();
-
-    (swapchain_id, swapchain_format)
-}
-
-struct TriangleTask {
-    pipeline: Option<Arc<GraphicsPipeline>>,
-    vertex_buffer_id: Id<Buffer>,
-    swapchain_id: Id<Swapchain>,
-}
-
-impl TriangleTask {
-    fn new(app: &mut App, swapchain_id: Id<Swapchain>) -> Self {
-        let vertices = [
-            MyVertex {
-                position: [-0.5, -0.25],
-            },
-            MyVertex {
-                position: [0.0, 0.5],
-            },
-            MyVertex {
-                position: [0.25, -0.1],
-            },
-        ];
-
-        // Allocate the Vulkan buffer that will hold the vertices.
-        //
-        // Since we are using vulkano's task graph, the buffer is created using the `Resources`
-        // collection.
-        let vertex_buffer_id = app
-            .resources
-            .create_buffer(
-                BufferCreateInfo {
-                    // We are going to bind this buffer as a vertex buffer.
-                    usage: BufferUsage::VERTEX_BUFFER,
-                    ..Default::default()
-                },
-                AllocationCreateInfo {
-                    // We want the buffer to be located on the device (GPU) so it is fast to access
-                    // from shaders. It must also be writable from the host side (CPU) to initially
-                    // upload the data.
-                    memory_type_filter: MemoryTypeFilter::PREFER_DEVICE
-                        | MemoryTypeFilter::HOST_SEQUENTIAL_WRITE,
-                    ..Default::default()
-                },
-                // The device layout determines the size and alignment of the buffer.
-                DeviceLayout::for_value(vertices.as_slice()).unwrap(),
-            )
+        builder
+            // Before we can draw, we have to *enter a render pass*. We specify which
+            // attachments we are going to use for rendering here, which needs to match
+            // what was previously specified when creating the pipeline.
+            .begin_rendering(RenderingInfo {
+                color_attachments: vec![Some(RenderingAttachmentInfo {
+                    load_op: AttachmentLoadOp::Clear,
+                    store_op: AttachmentStoreOp::Store,
+                    clear_value: Some([0.0, 0.0, 1.0, 1.0].into()),
+                    ..RenderingAttachmentInfo::image_view(
+                        // We specify image view corresponding to the currently acquired
+                        // swapchain image, to use for this attachment.
+                        rcx.attachment_image_views[image_index as usize].clone(),
+                    )
+                })],
+                ..Default::default()
+            })
+            .unwrap()
+            // We are now inside the first subpass of the render pass.
+            //
+            // TODO: Document state setting and how it affects subsequent draw commands.
+            .set_viewport(0, [rcx.viewport.clone()].into_iter().collect())
+            .unwrap()
+            .bind_pipeline_graphics(rcx.pipeline.clone())
+            .unwrap()
+            .bind_vertex_buffers(0, self.vertex_buffer.clone())
             .unwrap();
 
-        unsafe {
-            vulkano_taskgraph::execute(
-                &app.queue,
-                &app.resources,
-                app.flight_id,
-                |_cbf, tcx| {
-                    tcx.write_buffer::<[MyVertex]>(vertex_buffer_id, ..)?
-                        .copy_from_slice(&vertices);
+        unsafe { builder.draw(self.vertex_buffer.len() as u32, 1, 0, 0) }.unwrap();
 
-                    Ok(())
-                },
-                [(vertex_buffer_id, HostAccessType::Write)],
-                [],
-                [],
+        builder
+            // We leave the render pass.
+            .end_rendering()
+            .unwrap();
+
+        // Finish recording the command buffer by calling `end`.
+        let command_buffer = builder.build().unwrap();
+        let future = rcx
+            .previous_frame_end
+            .take()
+            .unwrap()
+            .join(acquire_future)
+            .then_execute(self.queue.clone(), command_buffer)
+            .unwrap()
+            // The color output is now expected to contain our triangle. But in order to
+            // show it on the screen, we have to *present* the image by calling
+            // `then_swapchain_present`.
+            //
+            // This function does not actually present the image immediately. Instead it
+            // submits a present command at the end of the queue. This means that it will
+            // only be presented once the GPU has finished executing the command buffer
+            // that draws the triangle.
+            .then_swapchain_present(
+                self.queue.clone(),
+                SwapchainPresentInfo::swapchain_image_index(rcx.swapchain.clone(), image_index),
             )
-        }
-        .unwrap();
+            .then_signal_fence_and_flush();
 
-        let pipeline = None;
-
-        Self {
-            pipeline,
-            vertex_buffer_id,
-            swapchain_id,
+        match future.map_err(Validated::unwrap) {
+            Ok(future) => {
+                rcx.previous_frame_end = Some(future.boxed());
+            }
+            Err(VulkanError::OutOfDate) => {
+                rcx.recreate_swapchain = true;
+                rcx.previous_frame_end = Some(sync::now(self.device.clone()).boxed());
+            }
+            Err(e) => {
+                println!("failed to flush future: {e}");
+                rcx.previous_frame_end = Some(sync::now(self.device.clone()).boxed());
+            }
         }
+        self.rcx = Some(rcx);
     }
 
-    pub fn create_pipeline(&mut self, app: &App, subpass: &Subpass) {
+    fn create_pipeline(&self, image_format: Format) -> Arc<GraphicsPipeline> {
         mod vs {
             vulkano_shaders::shader! {
                 ty: "vertex",
                 src: r"
-                            #version 450
+                                #version 450
 
-                            layout(location = 0) in vec2 position;
+                                layout(location = 0) in vec2 position;
 
-                            void main() {
-                                gl_Position = vec4(position, 0.0, 1.0);
-                            }
-                        ",
+                                void main() {
+                                    gl_Position = vec4(position, 0.0, 1.0);
+                                }
+                            ",
             }
         }
 
@@ -488,22 +440,23 @@ impl TriangleTask {
             vulkano_shaders::shader! {
                 ty: "fragment",
                 src: r"
-                            #version 450
+                                #version 450
 
-                            layout(location = 0) out vec4 f_color;
+                                layout(location = 0) out vec4 f_color;
 
-                            void main() {
-                                f_color = vec4(251.0 / 255.0, 113.0 / 255.0, 133.0 / 255.0, 1.0);
-                            }
-                        ",
+                                void main() {
+                                    f_color = vec4(251.0 / 255.0, 113.0 / 255.0, 133.0 / 255.0, 1.0);
+                                }
+                            ",
             }
         }
-        let pipeline = {
-            let vs = vs::load(app.device.clone())
+
+        {
+            let vs = vs::load(self.device.clone())
                 .unwrap()
                 .entry_point("main")
                 .unwrap();
-            let fs = fs::load(app.device.clone())
+            let fs = fs::load(self.device.clone())
                 .unwrap()
                 .entry_point("main")
                 .unwrap();
@@ -516,15 +469,20 @@ impl TriangleTask {
             ];
 
             let layout = PipelineLayout::new(
-                app.device.clone(),
+                self.device.clone(),
                 PipelineDescriptorSetLayoutCreateInfo::from_stages(stages.iter())
-                    .into_pipeline_layout_create_info(app.device.clone())
+                    .into_pipeline_layout_create_info(self.device.clone())
                     .unwrap(),
             )
             .unwrap();
 
+            let subpass = PipelineRenderingCreateInfo {
+                color_attachment_formats: vec![Some(image_format)],
+                ..Default::default()
+            };
+
             GraphicsPipeline::new(
-                app.device.clone(),
+                self.device.clone(),
                 None,
                 GraphicsPipelineCreateInfo {
                     stages: stages.into_iter().collect(),
@@ -544,49 +502,7 @@ impl TriangleTask {
                 },
             )
             .unwrap()
-        };
-
-        self.pipeline = Some(pipeline);
-    }
-}
-
-// The `Task` trait defines the logic of a task in the task graph.
-impl Task for TriangleTask {
-    type World = RenderContext;
-
-    fn clear_values(&self, clear_values: &mut ClearValues<'_>) {
-        // Earlier, we requested that the color attachment of the task node should be cleared. This
-        // method is where we specify the clear values that should be used.
-
-        clear_values.set(
-            self.swapchain_id.current_image_id(),
-            [2.0 / 255.0, 6.0 / 255.0, 24.0 / 255.0, 1.0],
-        );
-    }
-
-    unsafe fn execute(
-        &self,
-        cbf: &mut RecordingCommandBuffer<'_>,
-        _tcx: &mut TaskContext<'_>,
-        rcx: &Self::World,
-    ) -> vulkano_taskgraph::TaskResult {
-        // This method is called when the task graph executes the task node. Here, we record all
-        // GPU commands to execute as part of this task.
-
-        // Update the dynamic viewport, which is set to the current window and swapchain size.
-
-        unsafe {
-            cbf.set_viewport(0, std::slice::from_ref(&rcx.viewport))?;
-            cbf.bind_pipeline_graphics(self.pipeline.as_ref().unwrap())?;
-            cbf.bind_vertex_buffers(0, &[self.vertex_buffer_id], &[0], &[], &[])?;
-            cbf.draw(3, 1, 0, 0)?;
         }
-
-        // If you are familiar with Vulkan, you will notice that we have performed no manual
-        // synchronization here. This is handled entirely by the task graph as long as we have
-        // specified all resources that we want to access when creating the task node.
-
-        Ok(())
     }
 }
 
@@ -598,4 +514,12 @@ struct MyVertex {
     // We need to set a GPU compatible format for each vertex attribute.
     #[format(R32G32_SFLOAT)]
     position: [f32; 2],
+}
+
+// This function is called once during initialization, then again whenever the window is resized.
+fn window_size_dependent_setup(images: &[Arc<Image>]) -> Vec<Arc<ImageView>> {
+    images
+        .iter()
+        .map(|image| ImageView::new_default(image.to_owned()).unwrap())
+        .collect::<Vec<_>>()
 }
